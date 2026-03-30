@@ -1,0 +1,132 @@
+name: CI – Linux Build & Smoke Test
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    name: Build & Test (Ubuntu, .NET 8, x64)
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. .NET 8 SDK ──────────────────────────────────────────────────────
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # ── 3. Build & publish the managed C# library ─────────────────────────
+      - name: Restore & publish ThermoWrapperManaged
+        run: |
+          dotnet publish ThermoWrapperManaged/ThermoWrapperManaged.csproj \
+            -c Release \
+            -r linux-x64 \
+            --self-contained false \
+            -o publish
+
+      - name: Verify managed artifacts exist
+        run: |
+          ls -lh publish/ThermoWrapperManaged.dll
+          ls -lh publish/ThermoWrapperManaged.runtimeconfig.json
+
+      # ── 4. Locate the .NET hosting headers & libnethost ───────────────────
+      #   setup-dotnet installs the SDK under $DOTNET_ROOT.
+      #   The native host pack is in:
+      #     $DOTNET_ROOT/packs/Microsoft.NETCore.App.Host.linux-x64/<ver>/
+      #                       runtimes/linux-x64/native/
+      - name: Locate nethost headers and library
+        id: nethost
+        run: |
+          NATIVE_DIR=$(find "$DOTNET_ROOT/packs" \
+            -path "*/Microsoft.NETCore.App.Host.linux-x64/*/runtimes/linux-x64/native" \
+            -type d | sort -V | tail -1)
+          echo "native_dir=$NATIVE_DIR" >> "$GITHUB_OUTPUT"
+          echo "Found native dir: $NATIVE_DIR"
+          ls "$NATIVE_DIR"
+
+      # ── 5. Build the native C++ host ──────────────────────────────────────
+      - name: Build thermo_host (C++)
+        env:
+          NATIVE_DIR: ${{ steps.nethost.outputs.native_dir }}
+        run: |
+          g++ -std=c++17 \
+            -I"$NATIVE_DIR" \
+            -L"$NATIVE_DIR" \
+            thermo_host.cpp \
+            -o thermo_host \
+            -lnethost -ldl \
+            "-Wl,-rpath,$NATIVE_DIR" \
+            -Wl,-rpath,'$ORIGIN/publish'
+
+      - name: Confirm binary was produced
+        run: |
+          file thermo_host
+          ldd thermo_host
+
+      # ── 6. Smoke test – no real .raw file needed ──────────────────────────
+      #   Without a real file the host should exit non-zero and print a clear
+      #   error message.  We test two things:
+      #     a) missing argument → usage line on stderr
+      #     b) non-existent file → managed code returns -1 or -2 (not a crash)
+      - name: Smoke test – no arguments (usage message)
+        run: |
+          set +e
+          OUTPUT=$(./thermo_host 2>&1)
+          EXIT=$?
+          echo "exit=$EXIT  output=$OUTPUT"
+          echo "$OUTPUT" | grep -qi "usage"
+          echo "✓ Usage message printed"
+
+      - name: Smoke test – non-existent file (graceful error, no crash / SIGSEGV)
+        run: |
+          set +e
+          OUTPUT=$(./thermo_host /tmp/nonexistent.raw 2>&1)
+          EXIT=$?
+          echo "exit=$EXIT"
+          echo "output: $OUTPUT"
+          # Must NOT be killed by a signal (139 = SIGSEGV, 134 = SIGABRT, etc.)
+          if [ $EXIT -ge 128 ]; then
+            echo "❌ Process crashed with signal exit code $EXIT"
+            exit 1
+          fi
+          # Scan count must be negative (error sentinel), not a wild positive number
+          SCAN_LINE=$(echo "$OUTPUT" | grep -i "scan count" || true)
+          if [ -n "$SCAN_LINE" ]; then
+            COUNT=$(echo "$SCAN_LINE" | grep -oE '\-?[0-9]+')
+            if [ "$COUNT" -ge 0 ]; then
+              echo "❌ Expected negative scan count for missing file, got $COUNT"
+              exit 1
+            fi
+            echo "✓ Returned error sentinel: $SCAN_LINE"
+          else
+            echo "✓ No scan count printed (file not opened)"
+          fi
+
+      # ── 7. (Optional) Integration test with a real .raw file ──────────────
+      #   Upload a small .raw fixture to the repo (e.g. tests/fixtures/mini.raw)
+      #   and un-comment this step.
+      #
+      # - name: Integration test – real .raw file
+      #   run: |
+      #     OUTPUT=$(./thermo_host tests/fixtures/mini.raw 2>&1)
+      #     echo "$OUTPUT"
+      #     echo "$OUTPUT" | grep -E "^Scan count: [1-9][0-9]*"
+      #     echo "✓ Positive scan count returned"
+
+      # ── 8. Upload artifacts for inspection ───────────────────────────────
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: thermo-bridge-linux-x64
+          path: |
+            thermo_host
+            publish/
+          retention-days: 7
