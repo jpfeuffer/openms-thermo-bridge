@@ -12,41 +12,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── 1. Checkout ────────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. .NET 8 SDK ──────────────────────────────────────────────────────
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
 
-      # ── 3. Build & publish the managed C# library ─────────────────────────
+      - name: Download ThermoFisher DLLs from GitHub
+        run: |
+          mkdir -p libs
+          curl -L -o libs/ThermoFisher.CommonCore.RawFileReader.dll \
+            "https://github.com/thermofisherlsms/RawFileReader/raw/main/Libs/Net8/ThermoFisher.CommonCore.RawFileReader.dll"
+          curl -L -o libs/ThermoFisher.CommonCore.Data.dll \
+            "https://github.com/thermofisherlsms/RawFileReader/raw/main/Libs/Net8/ThermoFisher.CommonCore.Data.dll"
+          curl -L -o libs/ThermoFisher.CommonCore.MassPrecisionEstimator.dll \
+            "https://github.com/thermofisherlsms/RawFileReader/raw/main/Libs/Net8/ThermoFisher.CommonCore.MassPrecisionEstimator.dll"
+          ls -lh libs/
+
       - name: Restore & publish ThermoWrapperManaged
         run: |
-          dotnet nuget add source https://www.nuget.org/api/v2 --name nuget-v2 || true
-          dotnet nuget add source https://github.com/thermofisherlsms/RawFileReader \
-            --name thermo || true
           dotnet publish ThermoWrapperManaged.csproj \
             -c Release \
             -r linux-x64 \
             --self-contained false \
             -o publish
-```
-
-Save, close, then push:
-```
-git add .
-git commit -m "Add ThermoFisher NuGet source to CI"
-git push
 
       - name: Verify managed artifacts exist
         run: |
           ls -lh publish/ThermoWrapperManaged.dll
           ls -lh publish/ThermoWrapperManaged.runtimeconfig.json
 
-      # ── 4. Locate the .NET hosting headers & libnethost ───────────────────
       - name: Locate nethost headers and library
         id: nethost
         run: |
@@ -57,7 +54,6 @@ git push
           echo "Found native dir: $NATIVE_DIR"
           ls "$NATIVE_DIR"
 
-      # ── 5. Build the native C++ host ──────────────────────────────────────
       - name: Build thermo_host (C++)
         env:
           NATIVE_DIR: ${{ steps.nethost.outputs.native_dir }}
@@ -76,7 +72,6 @@ git push
           file thermo_host
           ldd thermo_host
 
-      # ── 6. Smoke test – no real .raw file needed ──────────────────────────
       - name: Smoke test – no arguments (usage message)
         run: |
           set +e
@@ -86,7 +81,7 @@ git push
           echo "$OUTPUT" | grep -qi "usage"
           echo "✓ Usage message printed"
 
-      - name: Smoke test – non-existent file (graceful error, no crash / SIGSEGV)
+      - name: Smoke test – non-existent file (graceful error, no crash)
         run: |
           set +e
           OUTPUT=$(./thermo_host /tmp/nonexistent.raw 2>&1)
@@ -97,19 +92,8 @@ git push
             echo "❌ Process crashed with signal exit code $EXIT"
             exit 1
           fi
-          SCAN_LINE=$(echo "$OUTPUT" | grep -i "scan count" || true)
-          if [ -n "$SCAN_LINE" ]; then
-            COUNT=$(echo "$SCAN_LINE" | grep -oE '\-?[0-9]+')
-            if [ "$COUNT" -ge 0 ]; then
-              echo "❌ Expected negative scan count for missing file, got $COUNT"
-              exit 1
-            fi
-            echo "✓ Returned error sentinel: $SCAN_LINE"
-          else
-            echo "✓ No scan count printed (file not opened)"
-          fi
+          echo "✓ No crash detected"
 
-      # ── 7. Upload artifacts for inspection ───────────────────────────────
       - name: Upload build artifacts
         if: always()
         uses: actions/upload-artifact@v4

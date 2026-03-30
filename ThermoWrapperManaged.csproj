@@ -7,7 +7,14 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="ThermoFisher.CommonCore.RawFileReader" Version="8.0.6" />
+    <Reference Include="ThermoFisher.CommonCore.RawFileReader">
+      <HintPath>libs/ThermoFisher.CommonCore.RawFileReader.dll</HintPath>
+    </Reference>
+    <Reference Include="ThermoFisher.CommonCore.Data">
+      <HintPath>libs/ThermoFisher.CommonCore.Data.dll</HintPath>
+    </Reference>
+    <Reference Include="ThermoFisher.CommonCore.MassPrecisionEstimator">
+      <HintPath>libs/ThermoFisher.CommonCore.MassPrecisionEstimator.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>
-
