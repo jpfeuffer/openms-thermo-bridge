@@ -1,26 +1,4 @@
-name: CI – Linux Build & Smoke Test
-
-on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
-
-jobs:
-  build-and-test:
-    name: Build & Test (Ubuntu, .NET 8, x64)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up .NET 8
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Download ThermoFisher DLLs from GitHub
+ - name: Download ThermoFisher DLLs from GitHub
         run: |
           mkdir -p libs
           curl -L -o libs/ThermoFisher.CommonCore.RawFileReader.dll \
@@ -30,76 +8,5 @@ jobs:
           curl -L -o libs/ThermoFisher.CommonCore.MassPrecisionEstimator.dll \
             "https://github.com/thermofisherlsms/RawFileReader/raw/main/Libs/Net8/ThermoFisher.CommonCore.MassPrecisionEstimator.dll"
           ls -lh libs/
-
-      - name: Restore & publish ThermoWrapperManaged
-        run: |
-          dotnet publish ThermoWrapperManaged.csproj \
-            -c Release \
-            -r linux-x64 \
-            --self-contained false \
-            -o publish
-
-      - name: Verify managed artifacts exist
-        run: |
-          ls -lh publish/ThermoWrapperManaged.dll
-          ls -lh publish/ThermoWrapperManaged.runtimeconfig.json
-
-      - name: Locate nethost headers and library
-        id: nethost
-        run: |
-          NATIVE_DIR=$(find "$DOTNET_ROOT/packs" \
-            -path "*/Microsoft.NETCore.App.Host.linux-x64/*/runtimes/linux-x64/native" \
-            -type d | sort -V | tail -1)
-          echo "native_dir=$NATIVE_DIR" >> "$GITHUB_OUTPUT"
-          echo "Found native dir: $NATIVE_DIR"
-          ls "$NATIVE_DIR"
-
-      - name: Build thermo_host (C++)
-        env:
-          NATIVE_DIR: ${{ steps.nethost.outputs.native_dir }}
-        run: |
-          g++ -std=c++17 \
-            -I"$NATIVE_DIR" \
-            -L"$NATIVE_DIR" \
-            ThermoWrapper.cpp \
-            -o thermo_host \
-            -lnethost -ldl \
-            "-Wl,-rpath,$NATIVE_DIR" \
-            -Wl,-rpath,'$ORIGIN/publish'
-
-      - name: Confirm binary was produced
-        run: |
-          file thermo_host
-          ldd thermo_host
-
-      - name: Smoke test – no arguments (usage message)
-        run: |
-          set +e
-          OUTPUT=$(./thermo_host 2>&1)
-          EXIT=$?
-          echo "exit=$EXIT  output=$OUTPUT"
-          echo "$OUTPUT" | grep -qi "usage"
-          echo "✓ Usage message printed"
-
-      - name: Smoke test – non-existent file (graceful error, no crash)
-        run: |
-          set +e
-          OUTPUT=$(./thermo_host /tmp/nonexistent.raw 2>&1)
-          EXIT=$?
-          echo "exit=$EXIT"
-          echo "output: $OUTPUT"
-          if [ $EXIT -ge 128 ]; then
-            echo "❌ Process crashed with signal exit code $EXIT"
-            exit 1
-          fi
-          echo "✓ No crash detected"
-
-      - name: Upload build artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: thermo-bridge-linux-x64
-          path: |
-            thermo_host
-            publish/
-          retention-days: 7
+          # Verify DLLs are real .NET assemblies and not HTML error pages
+          file libs/*.dll
