@@ -67,9 +67,8 @@ std::filesystem::path executable_path()
         buffer.resize(buffer.size() * 2);
     }
 #elif defined(__APPLE__)
-    std::uint32_t size = 0;
     std::vector<char> buffer(1024);
-    size = static_cast<std::uint32_t>(buffer.size());
+    std::uint32_t size = static_cast<std::uint32_t>(buffer.size());
     if (_NSGetExecutablePath(buffer.data(), &size) != 0)
     {
         buffer.resize(size);
@@ -177,11 +176,7 @@ std::filesystem::path hostfxr_path()
         throw bridge_error("get_hostfxr_path failed");
     }
 
-#if defined(_WIN32)
     return std::filesystem::path(buffer.data());
-#else
-    return std::filesystem::path(buffer.data());
-#endif
 }
 
 std::basic_string<char_t> to_char_t_path(const std::filesystem::path& path)
