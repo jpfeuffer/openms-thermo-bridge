@@ -2,7 +2,9 @@
 
 #include <array>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
+#include <iostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -179,6 +181,50 @@ std::filesystem::path hostfxr_path()
     return std::filesystem::path(buffer.data());
 }
 
+std::filesystem::path discover_dotnet_root()
+{
+    // Prefer the DOTNET_ROOT environment variable
+    const char* dotnet_root_env = std::getenv("DOTNET_ROOT");
+    if (dotnet_root_env != nullptr && dotnet_root_env[0] != '\0')
+    {
+        std::filesystem::path root(dotnet_root_env);
+        if (std::filesystem::is_directory(root))
+        {
+            return root;
+        }
+    }
+
+    // Fall back to the hostfxr location: hostfxr is typically at
+    // <dotnet_root>/host/fxr/<version>/libhostfxr.{so,dylib,dll}
+    try
+    {
+        const auto fxr = hostfxr_path();
+        // Go up: fxr file -> version dir -> fxr dir -> host dir -> dotnet_root
+        auto candidate = fxr.parent_path().parent_path().parent_path().parent_path();
+        if (std::filesystem::is_directory(candidate / "shared"))
+        {
+            return candidate;
+        }
+    }
+    catch (...)
+    {
+    }
+
+    return {};
+}
+
+#if defined(_WIN32)
+void HOSTFXR_CALLTYPE hostfxr_error_writer_callback(const char_t* message)
+{
+    std::wcerr << L"[hostfxr] " << message << L'\n';
+}
+#else
+void HOSTFXR_CALLTYPE hostfxr_error_writer_callback(const char_t* message)
+{
+    std::cerr << "[hostfxr] " << message << '\n';
+}
+#endif
+
 std::basic_string<char_t> to_char_t_path(const std::filesystem::path& path)
 {
 #if defined(_WIN32)
@@ -221,13 +267,30 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
 
     if (!std::filesystem::exists(runtime_config) || !std::filesystem::exists(assembly_path))
     {
-        throw bridge_error("Managed bridge runtime files are missing. Copy the managed directory next to your executable.");
+        throw bridge_error("Managed bridge runtime files are missing (managed_dir=" + managed_directory.string()
+            + ", runtime_config_exists=" + (std::filesystem::exists(runtime_config) ? "yes" : "no")
+            + ", assembly_exists=" + (std::filesystem::exists(assembly_path) ? "yes" : "no") + ")");
+    }
+
+    std::filesystem::path fxr_path;
+    try
+    {
+        fxr_path = hostfxr_path();
+        std::cerr << "[thermo_bridge] hostfxr path: " << fxr_path << "\n";
+    }
+    catch (const bridge_error&)
+    {
+        throw;
+    }
+    catch (...)
+    {
+        throw bridge_error("get_hostfxr_path failed with an unknown exception");
     }
 
     library_handle hostfxr_library = nullptr;
     try
     {
-        hostfxr_library = load_library(hostfxr_path());
+        hostfxr_library = load_library(fxr_path);
     }
     catch (const bridge_error&)
     {
@@ -245,17 +308,57 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
     auto hostfxr_close = reinterpret_cast<hostfxr_close_fn>(
         get_export(hostfxr_library, "hostfxr_close"));
 
+    // Register an error writer so hostfxr diagnostic messages go to stderr.
+    // This export may not exist in all hostfxr versions, so failure is not fatal.
+    try
+    {
+        auto set_error_writer = reinterpret_cast<hostfxr_set_error_writer_fn>(
+            get_export(hostfxr_library, "hostfxr_set_error_writer"));
+        if (set_error_writer != nullptr)
+        {
+            set_error_writer(&hostfxr_error_writer_callback);
+        }
+    }
+    catch (...)
+    {
+        // hostfxr_set_error_writer not available; ignore
+    }
+
+    // Resolve dotnet_root and pass it explicitly so hostfxr can find the
+    // shared frameworks even when .NET is installed in a non-default location
+    // (e.g. /Users/runner/.dotnet on macOS GitHub Actions runners).
+    const auto dotnet_root = discover_dotnet_root();
+    const auto dotnet_root_native = to_char_t_path(dotnet_root);
+    const auto host_path_native = to_char_t_path(executable_path());
+
+    hostfxr_initialize_parameters init_params{};
+    init_params.size = sizeof(init_params);
+    init_params.host_path = host_path_native.c_str();
+    if (!dotnet_root.empty())
+    {
+        init_params.dotnet_root = dotnet_root_native.c_str();
+        std::cerr << "[thermo_bridge] dotnet_root: " << dotnet_root << "\n";
+    }
+    else
+    {
+        std::cerr << "[thermo_bridge] dotnet_root: <not resolved, using hostfxr default>\n";
+    }
+
+    const hostfxr_initialize_parameters* params_ptr = dotnet_root.empty() ? nullptr : &init_params;
+
     hostfxr_handle context = nullptr;
     const auto runtime_config_native = to_char_t_path(runtime_config);
+    std::cerr << "[thermo_bridge] runtime_config: " << runtime_config << "\n";
     int rc = 0;
     try
     {
-        rc = hostfxr_initialize(runtime_config_native.c_str(), nullptr, &context);
+        rc = hostfxr_initialize(runtime_config_native.c_str(), params_ptr, &context);
     }
     catch (...)
     {
         throw bridge_error("hostfxr_initialize_for_runtime_config threw an unexpected exception");
     }
+    std::cerr << "[thermo_bridge] hostfxr_initialize rc=" << rc << " context=" << (context ? "valid" : "null") << "\n";
     // Return codes: 0 = Success, 1 = Success_HostAlreadyInitialized,
     // 2 = Success_DifferentRuntimeProperties.  Only negative values are errors.
     if (rc < 0)
@@ -281,6 +384,7 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
         throw bridge_error("hostfxr_get_runtime_delegate threw an unexpected exception");
     }
     hostfxr_close(context);
+    std::cerr << "[thermo_bridge] hostfxr_get_delegate rc=" << rc << "\n";
 
     if (rc != 0 || load_assembly == nullptr)
     {
@@ -289,6 +393,7 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
 
     get_scan_count_fn get_scan_count_entry = nullptr;
     const auto assembly_path_native = to_char_t_path(assembly_path);
+    std::cerr << "[thermo_bridge] loading assembly: " << assembly_path << "\n";
     try
     {
         rc = load_assembly(
@@ -303,6 +408,7 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
     {
         throw bridge_error("load_assembly_and_get_function_pointer threw an unexpected exception");
     }
+    std::cerr << "[thermo_bridge] load_assembly rc=" << rc << "\n";
 
     if (rc != 0 || get_scan_count_entry == nullptr)
     {
@@ -313,6 +419,7 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
     std::vector<char> utf8_path(utf8_string.begin(), utf8_string.end());
     utf8_path.push_back('\0');
 
+    std::cerr << "[thermo_bridge] calling GetScanCount for: " << raw_file_path << "\n";
     int scan_count = 0;
     try
     {
@@ -322,6 +429,7 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
     {
         throw bridge_error("Managed GetScanCount threw an unexpected exception");
     }
+    std::cerr << "[thermo_bridge] GetScanCount returned: " << scan_count << "\n";
 
     if (scan_count == -1)
     {
@@ -329,7 +437,7 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
     }
     if (scan_count < 0)
     {
-        throw bridge_error("Managed bridge failed while reading RAW file");
+        throw bridge_error("Managed bridge failed while reading RAW file (code " + std::to_string(scan_count) + ")");
     }
 
     return scan_count;
