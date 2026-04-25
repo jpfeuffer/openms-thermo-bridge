@@ -19,7 +19,7 @@ set(OPENMS_THERMO_BRIDGE_THERMO_VERSION "8.0.6" CACHE STRING "Thermo RawFileRead
 set(OPENMS_THERMO_BRIDGE_SAMPLE_RAW_URL "https://raw.githubusercontent.com/HegemanLab/small-thermo-raw-file-examples/cfac6a25b44913273dd458d5f5db9b20b0c1107d/ginkgotoxin-ms-positive.raw" CACHE STRING "Public sample RAW file used by the test suite.")
 option(OPENMS_THERMO_BRIDGE_DOWNLOAD_TEST_DATA "Download public sample RAW data when BUILD_TESTING is enabled." ON)
 
-set(OPENMS_THERMO_BRIDGE_MANAGED_DIR "${CMAKE_CURRENT_BINARY_DIR}/managed")
+set(OPENMS_THERMO_BRIDGE_MANAGED_DIR "${CMAKE_CURRENT_BINARY_DIR}/openms_thermo_bridge_managed")
 set(OPENMS_THERMO_BRIDGE_TEST_DATA_DIR "${CMAKE_CURRENT_BINARY_DIR}/testdata")
 set(OPENMS_THERMO_BRIDGE_MANAGED_FILES
     "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}/ThermoWrapperManaged.dll"
@@ -156,4 +156,5 @@ install(FILES
   "${CMAKE_CURRENT_BINARY_DIR}/OpenMSThermoBridgeConfig.cmake"
   "${CMAKE_CURRENT_BINARY_DIR}/OpenMSThermoBridgeConfigVersion.cmake"
   "${CMAKE_CURRENT_BINARY_DIR}/OpenMSThermoBridgeHelpers.cmake"
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindDotNetHost.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/OpenMSThermoBridge")

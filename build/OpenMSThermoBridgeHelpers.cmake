@@ -1,0 +1,20 @@
+include(CMakeParseArguments)
+
+set(OpenMSThermoBridge_MANAGED_DIR "${PACKAGE_PREFIX_DIR}/lib/openms_thermo_bridge/managed")
+
+function(openms_thermo_bridge_copy_runtime_files)
+  set(options)
+  set(one_value_args TARGET)
+  cmake_parse_arguments(ARG "${options}" "${one_value_args}" "" ${ARGN})
+
+  if(NOT ARG_TARGET)
+    message(FATAL_ERROR "openms_thermo_bridge_copy_runtime_files requires TARGET")
+  endif()
+
+  add_custom_command(TARGET ${ARG_TARGET} POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E rm -rf "$<TARGET_FILE_DIR:${ARG_TARGET}>/managed"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:${ARG_TARGET}>/managed"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${OpenMSThermoBridge_MANAGED_DIR}" "$<TARGET_FILE_DIR:${ARG_TARGET}>/managed"
+    COMMENT "Copying managed bridge runtime files for ${ARG_TARGET}"
+    VERBATIM)
+endfunction()

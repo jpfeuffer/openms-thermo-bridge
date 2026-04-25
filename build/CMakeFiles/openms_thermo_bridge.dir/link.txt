@@ -1,0 +1,2 @@
+/usr/bin/ar qc libopenms_thermo_bridge.a CMakeFiles/openms_thermo_bridge.dir/src/thermo_bridge.cpp.o
+/usr/bin/ranlib libopenms_thermo_bridge.a

@@ -26,18 +26,22 @@ if(NOT _dotnet_host_rid)
 endif()
 
 set(_dotnet_host_roots)
+if(DEFINED ENV{DOTNET_ROOT} AND NOT "$ENV{DOTNET_ROOT}" STREQUAL "")
+  file(TO_CMAKE_PATH "$ENV{DOTNET_ROOT}" _dotnet_root_path)
+  list(APPEND _dotnet_host_roots "${_dotnet_root_path}")
+endif()
+if(WIN32 AND DEFINED ENV{DOTNET_ROOT_x86} AND NOT "$ENV{DOTNET_ROOT_x86}" STREQUAL "")
+  file(TO_CMAKE_PATH "$ENV{DOTNET_ROOT_x86}" _dotnet_root_x86_path)
+  list(APPEND _dotnet_host_roots "${_dotnet_root_x86_path}")
+endif()
 foreach(candidate IN ITEMS
-    "$ENV{DOTNET_ROOT}"
-    "$ENV{DOTNET_ROOT(x86)}"
     "/usr/share/dotnet"
     "/usr/local/share/dotnet"
     "/opt/homebrew/share/dotnet"
     "C:/Program Files/dotnet"
     "C:/Program Files (x86)/dotnet")
-  if(candidate)
-    file(TO_CMAKE_PATH "${candidate}" candidate_path)
-    list(APPEND _dotnet_host_roots "${candidate_path}")
-  endif()
+  file(TO_CMAKE_PATH "${candidate}" candidate_path)
+  list(APPEND _dotnet_host_roots "${candidate_path}")
 endforeach()
 list(REMOVE_DUPLICATES _dotnet_host_roots)
 

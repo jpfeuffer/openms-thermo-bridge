@@ -25,6 +25,12 @@
 #include <unistd.h>
 #endif
 
+#if defined(_WIN32)
+#define OPENMS_THERMO_BRIDGE_CHAR_T_LITERAL(value) L##value
+#else
+#define OPENMS_THERMO_BRIDGE_CHAR_T_LITERAL(value) value
+#endif
+
 using hostfxr_initialize_for_runtime_config_fn =
     int(*)(const char_t*, const hostfxr_initialize_parameters*, hostfxr_handle*);
 using hostfxr_get_runtime_delegate_fn =
@@ -235,8 +241,8 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
     const auto assembly_path_native = to_char_t_path(assembly_path);
     rc = load_assembly(
         assembly_path_native.c_str(),
-        STR("ThermoWrapperManaged.RawBridge, ThermoWrapperManaged"),
-        STR("GetScanCount"),
+        OPENMS_THERMO_BRIDGE_CHAR_T_LITERAL("ThermoWrapperManaged.RawBridge, ThermoWrapperManaged"),
+        OPENMS_THERMO_BRIDGE_CHAR_T_LITERAL("GetScanCount"),
         UNMANAGEDCALLERSONLY_METHOD,
         nullptr,
         reinterpret_cast<void**>(&get_scan_count_entry));
