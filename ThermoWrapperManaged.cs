@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using ThermoFisher.CommonCore.RawFileReader;
 using ThermoFisher.CommonCore.Data.Business;
@@ -13,12 +14,12 @@ namespace ThermoWrapperManaged
             try
             {
                 string? filePath = Marshal.PtrToStringUTF8(filePathPtr);
-                if (filePath == null) return -1;
-                var rawFile = RawFileReaderAdapter.FileFactory(filePath);
+                if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return -1;
+
+                using var rawFile = RawFileReaderAdapter.FileFactory(filePath);
                 if (rawFile == null) return -1;
                 rawFile.SelectInstrument(Device.MS, 1);
                 int lastScan = rawFile.RunHeader.LastSpectrum;
-                rawFile.Dispose();
                 return lastScan;
             }
             catch (Exception)

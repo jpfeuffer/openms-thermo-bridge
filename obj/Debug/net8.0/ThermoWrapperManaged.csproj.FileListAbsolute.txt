@@ -1,5 +1,0 @@
-/home/runner/work/openms-thermo-bridge/openms-thermo-bridge/obj/Debug/net8.0/ThermoWrapperManaged.GeneratedMSBuildEditorConfig.editorconfig
-/home/runner/work/openms-thermo-bridge/openms-thermo-bridge/obj/Debug/net8.0/ThermoWrapperManaged.AssemblyInfoInputs.cache
-/home/runner/work/openms-thermo-bridge/openms-thermo-bridge/obj/Debug/net8.0/ThermoWrapperManaged.AssemblyInfo.cs
-/home/runner/work/openms-thermo-bridge/openms-thermo-bridge/obj/Debug/net8.0/ThermoWrapperManaged.csproj.CoreCompileInputs.cache
-/home/runner/work/openms-thermo-bridge/openms-thermo-bridge/obj/Debug/net8.0/ThermoWrapperManaged.sourcelink.json
