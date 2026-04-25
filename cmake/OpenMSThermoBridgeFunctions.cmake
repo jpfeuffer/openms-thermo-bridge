@@ -25,10 +25,17 @@ function(openms_thermo_bridge_copy_runtime_files)
     message(FATAL_ERROR "openms_thermo_bridge_copy_runtime_files requires MANAGED_DIR or OpenMSThermoBridge_MANAGED_DIR")
   endif()
 
-  add_custom_command(TARGET ${ARG_TARGET} POST_BUILD
+  set(_openms_thermo_bridge_runtime_commands
     COMMAND "${CMAKE_COMMAND}" -E rm -rf "$<TARGET_FILE_DIR:${ARG_TARGET}>/managed"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:${ARG_TARGET}>/managed"
-    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${ARG_MANAGED_DIR}" "$<TARGET_FILE_DIR:${ARG_TARGET}>/managed"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${ARG_MANAGED_DIR}" "$<TARGET_FILE_DIR:${ARG_TARGET}>/managed")
+  if(DotNetHost_RUNTIME_LIBRARY)
+    list(APPEND _openms_thermo_bridge_runtime_commands
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${DotNetHost_RUNTIME_LIBRARY}" "$<TARGET_FILE_DIR:${ARG_TARGET}>")
+  endif()
+
+  add_custom_command(TARGET ${ARG_TARGET} POST_BUILD
+    ${_openms_thermo_bridge_runtime_commands}
     COMMENT "Copying managed bridge runtime files for ${ARG_TARGET}"
     VERBATIM)
 endfunction()

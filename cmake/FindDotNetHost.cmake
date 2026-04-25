@@ -54,25 +54,36 @@ list(SORT _dotnet_host_candidates COMPARE NATURAL ORDER DESCENDING)
 
 set(DotNetHost_INCLUDE_DIR)
 set(DotNetHost_LIBRARY)
+set(DotNetHost_RUNTIME_LIBRARY)
 foreach(candidate IN LISTS _dotnet_host_candidates)
   if(EXISTS "${candidate}/nethost.h")
     if(WIN32)
       set(_candidate_library "${candidate}/nethost.lib")
+      set(_candidate_runtime "${candidate}/nethost.dll")
     elseif(APPLE)
-      set(_candidate_library "${candidate}/libnethost.dylib")
+      set(_candidate_library "${candidate}/libnethost.a")
       if(NOT EXISTS "${_candidate_library}")
-        set(_candidate_library "${candidate}/libnethost.a")
+        set(_candidate_library "${candidate}/libnethost.dylib")
       endif()
+      set(_candidate_runtime "${candidate}/libnethost.dylib")
     else()
-      set(_candidate_library "${candidate}/libnethost.so")
+      set(_candidate_library "${candidate}/libnethost.a")
       if(NOT EXISTS "${_candidate_library}")
-        set(_candidate_library "${candidate}/libnethost.a")
+        set(_candidate_library "${candidate}/libnethost.so")
       endif()
+      set(_candidate_runtime "${candidate}/libnethost.so")
     endif()
 
     if(EXISTS "${_candidate_library}")
       set(DotNetHost_INCLUDE_DIR "${candidate}")
       set(DotNetHost_LIBRARY "${_candidate_library}")
+      if(EXISTS "${_candidate_runtime}" AND NOT DotNetHost_LIBRARY MATCHES "\\.(a|lib)$")
+        set(DotNetHost_RUNTIME_LIBRARY "${_candidate_runtime}")
+      elseif(WIN32 AND EXISTS "${_candidate_runtime}")
+        set(DotNetHost_RUNTIME_LIBRARY "${_candidate_runtime}")
+      else()
+        unset(DotNetHost_RUNTIME_LIBRARY)
+      endif()
       break()
     endif()
   endif()
@@ -84,7 +95,14 @@ find_package_handle_standard_args(DotNetHost
 
 if(DotNetHost_FOUND AND NOT TARGET DotNetHost::nethost)
   add_library(DotNetHost::nethost UNKNOWN IMPORTED)
-  set_target_properties(DotNetHost::nethost PROPERTIES
-    IMPORTED_LOCATION "${DotNetHost_LIBRARY}"
-    INTERFACE_INCLUDE_DIRECTORIES "${DotNetHost_INCLUDE_DIR}")
+  if(WIN32 AND DotNetHost_RUNTIME_LIBRARY)
+    set_target_properties(DotNetHost::nethost PROPERTIES
+      IMPORTED_IMPLIB "${DotNetHost_LIBRARY}"
+      IMPORTED_LOCATION "${DotNetHost_RUNTIME_LIBRARY}"
+      INTERFACE_INCLUDE_DIRECTORIES "${DotNetHost_INCLUDE_DIR}")
+  else()
+    set_target_properties(DotNetHost::nethost PROPERTIES
+      IMPORTED_LOCATION "${DotNetHost_LIBRARY}"
+      INTERFACE_INCLUDE_DIRECTORIES "${DotNetHost_INCLUDE_DIR}")
+  endif()
 endif()
