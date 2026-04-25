@@ -344,15 +344,13 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
         std::cerr << "[thermo_bridge] dotnet_root: <not resolved, using hostfxr default>\n";
     }
 
-    const hostfxr_initialize_parameters* params_ptr = dotnet_root.empty() ? nullptr : &init_params;
-
     hostfxr_handle context = nullptr;
     const auto runtime_config_native = to_char_t_path(runtime_config);
     std::cerr << "[thermo_bridge] runtime_config: " << runtime_config << "\n";
     int rc = 0;
     try
     {
-        rc = hostfxr_initialize(runtime_config_native.c_str(), params_ptr, &context);
+        rc = hostfxr_initialize(runtime_config_native.c_str(), &init_params, &context);
     }
     catch (...)
     {
