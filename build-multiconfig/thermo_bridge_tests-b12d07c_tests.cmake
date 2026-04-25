@@ -1,5 +1,0 @@
-add_test( [==[Missing RAW files are reported as bridge errors]==] /home/runner/work/openms-thermo-bridge/openms-thermo-bridge/build-multiconfig/Release/thermo_bridge_tests [==[Missing RAW files are reported as bridge errors]==]  )
-set_tests_properties( [==[Missing RAW files are reported as bridge errors]==] PROPERTIES WORKING_DIRECTORY /home/runner/work/openms-thermo-bridge/openms-thermo-bridge/build-multiconfig SKIP_RETURN_CODE 4)
-add_test( [==[The public sample RAW file reports the expected scan count]==] /home/runner/work/openms-thermo-bridge/openms-thermo-bridge/build-multiconfig/Release/thermo_bridge_tests [==[The public sample RAW file reports the expected scan count]==]  )
-set_tests_properties( [==[The public sample RAW file reports the expected scan count]==] PROPERTIES WORKING_DIRECTORY /home/runner/work/openms-thermo-bridge/openms-thermo-bridge/build-multiconfig SKIP_RETURN_CODE 4)
-set( thermo_bridge_tests_TESTS [==[Missing RAW files are reported as bridge errors]==] [==[The public sample RAW file reports the expected scan count]==])
