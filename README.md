@@ -12,6 +12,13 @@ A CMake-packaged native C++ bridge that embeds the .NET runtime, calls the offic
 ## Build
 The project does **not** download the Thermo vendor packages by default.
 
+### Apple Silicon macOS workaround
+Thermo RawFileReader currently works in this repository on Apple Silicon macOS only through an `osx-x64`/Rosetta workaround. On Apple Silicon, CMake enables `OPENMS_THERMO_BRIDGE_OSX_ARM64_X64_WORKAROUND=ON` by default, forces `x86_64` native targets, and publishes the managed bridge with `dotnet publish --os osx -a x64`.
+
+This workaround trades correctness for native performance: expect slower startup and RAW access under emulation. You can disable it with `-DOPENMS_THERMO_BRIDGE_OSX_ARM64_X64_WORKAROUND=OFF`, but current upstream Thermo packages are known to fail as native `osx-arm64` builds.
+
+If Apple Silicon support matters to you, please track or upvote the upstream report at https://github.com/thermofisherlsms/RawFileReader/issues/3?issue=fgcz%7Crawrr%7C75 and consider contacting Thermo support to request native `osx-arm64` binaries.
+
 ### Option 1: provide the vendor `.nupkg` files yourself
 Place the following files in `vendor/thermo-feed` or point CMake at another directory with `-DOPENMS_THERMO_BRIDGE_VENDOR_DIR=/absolute/path`:
 - `ThermoFisher.CommonCore.BackgroundSubtraction.8.0.6.nupkg`
@@ -85,6 +92,7 @@ openms_thermo_bridge_copy_runtime_files(TARGET my_tool)
 - .NET 8 SDK with the platform-specific `nethost` pack installed
 - A C++17 compiler
 - Network access to `api.nuget.org` and, when the relevant options are enabled, `raw.githubusercontent.com`
+- On Apple Silicon macOS, an `osx-x64` .NET 8 installation usable through Rosetta when the workaround is enabled
 
 ## Status
 - [x] Linux, macOS, and Windows CMake builds

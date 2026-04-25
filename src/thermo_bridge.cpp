@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -21,6 +22,7 @@
 
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
+#include <sys/sysctl.h>
 #endif
 
 #if defined(__linux__)
@@ -213,6 +215,38 @@ std::filesystem::path discover_dotnet_root()
     return {};
 }
 
+#if defined(__APPLE__)
+bool is_running_under_rosetta()
+{
+    int translated = 0;
+    std::size_t translated_size = sizeof(translated);
+    if (sysctlbyname("sysctl.proc_translated", &translated, &translated_size, nullptr, 0) != 0)
+    {
+        return false;
+    }
+
+    return translated == 1;
+}
+#endif
+
+void warn_about_emulation_if_needed()
+{
+#if defined(__APPLE__)
+    static std::once_flag warning_once;
+    std::call_once(warning_once, []()
+    {
+        if (is_running_under_rosetta())
+        {
+            std::cerr
+                << "[thermo_bridge] warning: running through Rosetta because Thermo RawFileReader does not yet have "
+                   "native osx-arm64 support. Expect slower performance under emulation. Track "
+                   "https://github.com/thermofisherlsms/RawFileReader/issues/3?issue=fgcz%7Crawrr%7C75 and contact "
+                   "Thermo support if native Apple Silicon support is important for your workflow.\n";
+        }
+    });
+#endif
+}
+
 #if defined(_WIN32)
 void HOSTFXR_CALLTYPE hostfxr_error_writer_callback(const char_t* message)
 {
@@ -262,6 +296,8 @@ int get_scan_count(const std::filesystem::path& raw_file_path)
 
 int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesystem::path& managed_directory)
 {
+    warn_about_emulation_if_needed();
+
     const std::filesystem::path runtime_config = managed_directory / "ThermoWrapperManaged.runtimeconfig.json";
     const std::filesystem::path assembly_path = managed_directory / "ThermoWrapperManaged.dll";
 
