@@ -1,6 +1,6 @@
 ﻿# OpenMS Thermo Raw File Bridge
 
-A minimal Linux bridge that embeds the .NET 8 runtime inside a native C++ executable and exposes Thermo RAW scan counting through the official ThermoFisher RawFileReader libraries.
+A minimal Linux bridge that embeds the .NET 8 runtime inside a native C++ executable and exposes Thermo RAW scan counting through the official ThermoFisher RawFileReader libraries!
 
 ## What This Does
 - Downloads the official ThermoFisher .NET 8 packages from the upstream RawFileReader repository
