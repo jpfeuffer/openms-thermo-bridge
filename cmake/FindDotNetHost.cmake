@@ -33,6 +33,10 @@ if(NOT _dotnet_host_rid)
 endif()
 
 set(_dotnet_host_roots)
+if(APPLE AND _dotnet_host_rid STREQUAL "osx-x64" AND DEFINED ENV{DOTNET_ROOT_X64} AND NOT "$ENV{DOTNET_ROOT_X64}" STREQUAL "")
+  file(TO_CMAKE_PATH "$ENV{DOTNET_ROOT_X64}" _dotnet_root_x64_path)
+  list(APPEND _dotnet_host_roots "${_dotnet_root_x64_path}")
+endif()
 if(DEFINED ENV{DOTNET_ROOT} AND NOT "$ENV{DOTNET_ROOT}" STREQUAL "")
   file(TO_CMAKE_PATH "$ENV{DOTNET_ROOT}" _dotnet_root_path)
   list(APPEND _dotnet_host_roots "${_dotnet_root_path}")
@@ -42,9 +46,13 @@ if(WIN32 AND DEFINED ENV{DOTNET_ROOT_x86} AND NOT "$ENV{DOTNET_ROOT_x86}" STREQU
   list(APPEND _dotnet_host_roots "${_dotnet_root_x86_path}")
 endif()
 foreach(candidate IN ITEMS
+    "$ENV{HOME}/.dotnet-x64"
+    "$ENV{HOME}/.dotnet/x64"
     "/usr/share/dotnet"
     "/usr/local/share/dotnet"
+    "/usr/local/share/dotnet/x64"
     "/opt/homebrew/share/dotnet"
+    "/opt/homebrew/share/dotnet/x64"
     "C:/Program Files/dotnet"
     "C:/Program Files (x86)/dotnet")
   file(TO_CMAKE_PATH "${candidate}" candidate_path)
@@ -98,7 +106,7 @@ endforeach()
 
 find_package_handle_standard_args(DotNetHost
   REQUIRED_VARS DotNetHost_INCLUDE_DIR DotNetHost_LIBRARY
-  FAIL_MESSAGE "Could not locate the .NET nethost SDK pack for ${_dotnet_host_rid}")
+  FAIL_MESSAGE "Could not locate the .NET nethost SDK pack for ${_dotnet_host_rid}. For the Apple Silicon Rosetta workaround, install an osx-x64 .NET SDK/runtime and set DOTNET_ROOT_X64 (or DOTNET_ROOT) to that x64 installation.")
 
 if(DotNetHost_FOUND AND NOT TARGET DotNetHost::nethost)
   if(WIN32 AND DotNetHost_RUNTIME_LIBRARY)

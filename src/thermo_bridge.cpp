@@ -185,6 +185,19 @@ std::filesystem::path hostfxr_path()
 
 std::filesystem::path discover_dotnet_root()
 {
+    // Prefer an explicit x64 root for Apple Silicon/Rosetta workflows.
+#if defined(__APPLE__) && defined(__x86_64__)
+    const char* dotnet_root_x64_env = std::getenv("DOTNET_ROOT_X64");
+    if (dotnet_root_x64_env != nullptr && dotnet_root_x64_env[0] != '\0')
+    {
+        std::filesystem::path root(dotnet_root_x64_env);
+        if (std::filesystem::is_directory(root))
+        {
+            return root;
+        }
+    }
+#endif
+
     // Prefer the DOTNET_ROOT environment variable
     const char* dotnet_root_env = std::getenv("DOTNET_ROOT");
     if (dotnet_root_env != nullptr && dotnet_root_env[0] != '\0')

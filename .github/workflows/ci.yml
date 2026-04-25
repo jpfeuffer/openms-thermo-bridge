@@ -23,9 +23,27 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up .NET 8 SDK
+        if: runner.os != 'macOS'
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+
+      - name: Set up .NET 8 SDK (macOS x64 workaround)
+        if: runner.os == 'macOS'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+          architecture: x64
+          install-dir: /Users/runner/.dotnet-x64
+
+      - name: Configure .NET environment for macOS x64 workaround
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "/Users/runner/.dotnet-x64" >> "${GITHUB_PATH}"
+          echo "DOTNET_ROOT=/Users/runner/.dotnet-x64" >> "${GITHUB_ENV}"
+          echo "DOTNET_ROOT_X64=/Users/runner/.dotnet-x64" >> "${GITHUB_ENV}"
+          echo "DOTNET_MULTILEVEL_LOOKUP=0" >> "${GITHUB_ENV}"
 
       - name: Debug .NET environment
         shell: bash
@@ -34,6 +52,8 @@ jobs:
           dotnet --info || true
           echo "=== DOTNET_ROOT ==="
           echo "DOTNET_ROOT=${DOTNET_ROOT:-<not set>}"
+          echo "=== DOTNET_ROOT_X64 ==="
+          echo "DOTNET_ROOT_X64=${DOTNET_ROOT_X64:-<not set>}"
           echo "=== .NET packs ==="
           if [ -d "${DOTNET_ROOT:-/usr/share/dotnet}/packs" ]; then
             find "${DOTNET_ROOT:-/usr/share/dotnet}/packs" -maxdepth 4 -name 'nethost*' -o -name 'libnethost*' 2>/dev/null | head -30 || true
