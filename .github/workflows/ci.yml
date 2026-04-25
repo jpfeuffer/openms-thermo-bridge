@@ -8,8 +8,15 @@ permissions:
   contents: read
 
 jobs:
-  linux-build-and-run:
-    runs-on: ubuntu-latest
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
 
     steps:
       - name: Check out repository
@@ -20,27 +27,21 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Build native host and managed bridge
-        run: bash "${GITHUB_WORKSPACE}/build_linux.sh"
-
-      - name: Download sample RAW file
+      - name: Configure
+        shell: bash
         run: |
-          mkdir -p /tmp/openms-thermo-bridge-samples
-          curl -fsSL \
-            https://raw.githubusercontent.com/HegemanLab/small-thermo-raw-file-examples/cfac6a25b44913273dd458d5f5db9b20b0c1107d/ginkgotoxin-ms-positive.raw \
-            -o /tmp/openms-thermo-bridge-samples/ginkgotoxin-ms-positive.raw
+          cmake -S "${GITHUB_WORKSPACE}" -B "${GITHUB_WORKSPACE}/build" \
+            -DOPENMS_THERMO_BRIDGE_ENABLE_VENDOR_DOWNLOAD=ON \
+            -DOPENMS_THERMO_BRIDGE_DOWNLOAD_TEST_DATA=ON
 
-      - name: Verify missing file handling
-        run: |
-          set +e
-          output=$("${GITHUB_WORKSPACE}/artifacts/publish/thermo_host" /tmp/openms-thermo-bridge-samples/does-not-exist.raw 2>/tmp/openms-thermo-bridge-samples/missing.stderr)
-          status=$?
-          set -e
-          test "${status}" -eq 1
-          test -z "${output}"
-          grep -q "Could not open RAW file" /tmp/openms-thermo-bridge-samples/missing.stderr
+      - name: Build
+        shell: bash
+        run: cmake --build "${GITHUB_WORKSPACE}/build" --config Release --parallel
 
-      - name: Verify scan count on sample RAW file
-        run: |
-          output=$("${GITHUB_WORKSPACE}/artifacts/publish/thermo_host" /tmp/openms-thermo-bridge-samples/ginkgotoxin-ms-positive.raw)
-          test "${output}" = "Scan count: 90"
+      - name: Run tests
+        shell: bash
+        run: ctest --test-dir "${GITHUB_WORKSPACE}/build" --build-config Release --output-on-failure
+
+      - name: Install package
+        shell: bash
+        run: cmake --install "${GITHUB_WORKSPACE}/build" --config Release --prefix "${GITHUB_WORKSPACE}/install"

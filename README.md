@@ -1,44 +1,49 @@
-﻿# OpenMS Thermo Raw File Bridge
+# OpenMS Thermo Raw File Bridge
 
-A minimal Linux bridge that embeds the .NET 8 runtime inside a native C++ executable and exposes Thermo RAW scan counting through the official ThermoFisher RawFileReader libraries!
+A CMake-packaged native C++ bridge that embeds the .NET runtime, calls the official ThermoFisher RawFileReader libraries through a managed shim, and exposes Thermo RAW scan counting to native consumers.
 
 ## What This Does
-- Downloads the official ThermoFisher .NET 8 packages from the upstream RawFileReader repository
+- Builds a native bridge library and the `thermo_host` CLI with CMake
 - Publishes a managed bridge with an `UnmanagedCallersOnly` `GetScanCount` entry point
-- Builds a native Linux host that loads .NET through `nethost` and `hostfxr`
-- Prints the number of scans for a Thermo `.raw` file
-
-## Architecture
-```text
-native caller / CLI
-       |
-thermo_host
-       |
-hostfxr + .NET 8 runtime
-       |
-ThermoWrapperManaged.dll
-       |
-ThermoFisher.CommonCore.RawFileReader
-       |
-.raw file
-```
+- Packages exported CMake targets for `add_subdirectory`/FetchContent and `find_package(... CONFIG)` workflows
+- Runs a small Catch2-based test suite through CTest
+- Supports Linux, macOS, and Windows builds
 
 ## Build
+The project does **not** download the Thermo vendor packages by default.
+
+### Option 1: provide the vendor `.nupkg` files yourself
+Place the following files in `vendor/thermo-feed` or point CMake at another directory with `-DOPENMS_THERMO_BRIDGE_VENDOR_DIR=/absolute/path`:
+- `ThermoFisher.CommonCore.BackgroundSubtraction.8.0.6.nupkg`
+- `ThermoFisher.CommonCore.Data.8.0.6.nupkg`
+- `ThermoFisher.CommonCore.MassPrecisionEstimator.8.0.6.nupkg`
+- `ThermoFisher.CommonCore.RandomAccessReaderPlugin.8.0.6.nupkg`
+- `ThermoFisher.CommonCore.RawfileReader.8.0.6.nupkg`
+
+Then configure and build:
+
 ```bash
-./build_linux.sh
+cmake -S . -B build
+cmake --build build --parallel
 ```
 
-This produces:
+### Option 2: explicitly allow CMake to fetch the vendor packages
+```bash
+cmake -S . -B build \
+  -DOPENMS_THERMO_BRIDGE_ENABLE_VENDOR_DOWNLOAD=ON
+cmake --build build --parallel
+```
 
-```text
-artifacts/publish/thermo_host
-artifacts/publish/managed/ThermoWrapperManaged.dll
-artifacts/publish/managed/ThermoWrapperManaged.runtimeconfig.json
+For Linux convenience, `build_linux.sh` configures, builds, and runs the tests with the vendor-download option enabled.
+
+## Test
+```bash
+ctest --test-dir build --output-on-failure
 ```
 
 ## Run
 ```bash
-./artifacts/publish/thermo_host /path/to/file.raw
+./build/thermo_host /path/to/file.raw
 ```
 
 Expected output:
@@ -47,19 +52,42 @@ Expected output:
 Scan count: <number>
 ```
 
-For a reproducible validation run, this repository uses the public `ginkgotoxin-ms-positive.raw` sample from `HegemanLab/small-thermo-raw-file-examples`, which currently reports:
+The public `ginkgotoxin-ms-positive.raw` sample used in CI currently reports:
 
 ```text
 Scan count: 90
 ```
 
+## CMake Consumption
+### FetchContent / add_subdirectory
+```cmake
+FetchContent_Declare(OpenMSThermoBridge
+  GIT_REPOSITORY https://github.com/jpfeuffer/openms-thermo-bridge.git
+  GIT_TAG main)
+FetchContent_MakeAvailable(OpenMSThermoBridge)
+
+add_executable(my_tool main.cpp)
+target_link_libraries(my_tool PRIVATE OpenMSThermoBridge::openms_thermo_bridge)
+openms_thermo_bridge_copy_runtime_files(TARGET my_tool)
+```
+
+### Installed package / `find_package(... CONFIG)`
+```cmake
+find_package(OpenMSThermoBridge CONFIG REQUIRED)
+
+add_executable(my_tool main.cpp)
+target_link_libraries(my_tool PRIVATE OpenMSThermoBridge::openms_thermo_bridge)
+openms_thermo_bridge_copy_runtime_files(TARGET my_tool)
+```
+
 ## Requirements
-- Linux x64
-- .NET SDK with the Linux `nethost` pack installed
+- CMake 3.21+
+- .NET 8 SDK with the platform-specific `nethost` pack installed
 - A C++17 compiler
-- Network access to `raw.githubusercontent.com` and `api.nuget.org`
+- Network access to `api.nuget.org` and, when the relevant options are enabled, `raw.githubusercontent.com`
 
 ## Status
-- [x] Linux x64 host build
-- [x] .NET 8 embedding
-- [x] `GetScanCount` bridge
+- [x] Linux, macOS, and Windows CMake builds
+- [x] Native C++ bridge library and CLI
+- [x] Catch2/CTest integration tests
+- [x] Exported CMake package config
