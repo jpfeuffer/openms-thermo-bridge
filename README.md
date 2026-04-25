@@ -1,58 +1,65 @@
 ﻿# OpenMS Thermo Raw File Bridge
 
-A minimal C++/CLI bridge that embeds the .NET runtime to read Thermo `.raw` files via the official ThermoFisher vendor DLLs.
+A minimal Linux bridge that embeds the .NET 8 runtime inside a native C++ executable and exposes Thermo RAW scan counting through the official ThermoFisher RawFileReader libraries.
 
 ## What This Does
-- Embeds .NET 9 runtime inside a native C++ DLL
-- Loads ThermoFisher.CommonCore vendor DLLs
-- Exposes a simple C++ API to read mass spectra from `.raw` files
-- Tested on Windows x64
+- Downloads the official ThermoFisher .NET 8 packages from the upstream RawFileReader repository
+- Publishes a managed bridge with an `UnmanagedCallersOnly` `GetScanCount` entry point
+- Builds a native Linux host that loads .NET through `nethost` and `hostfxr`
+- Prints the number of scans for a Thermo `.raw` file
 
 ## Architecture
-```
-Python / C++ caller
+```text
+native caller / CLI
        |
-ThermoWrapper.dll  (C++/CLI bridge)
+thermo_host
        |
-ThermoFisher.CommonCore.RawFileReader.dll  (vendor .NET DLL)
+hostfxr + .NET 8 runtime
+       |
+ThermoWrapperManaged.dll
+       |
+ThermoFisher.CommonCore.RawFileReader
        |
 .raw file
 ```
 
-## API
-```cpp
-RawBridge::GetScanCount(filePath)      // Total number of scans
-RawBridge::GetRetentionTime(filePath, scanNum)  // Retention time in minutes
-RawBridge::GetScanFilter(filePath, scanNum)     // Scan filter string
-RawBridge::GetScan(filePath, scanNum)           // Full spectrum (m/z + intensity arrays)
+## Build
+```bash
+./build_linux.sh
+```
+
+This produces:
+
+```text
+artifacts/publish/thermo_host
+artifacts/publish/managed/ThermoWrapperManaged.dll
+artifacts/publish/managed/ThermoWrapperManaged.runtimeconfig.json
+```
+
+## Run
+```bash
+./artifacts/publish/thermo_host /path/to/file.raw
+```
+
+Expected output:
+
+```text
+Scan count: <number>
+```
+
+For a reproducible validation run, this repository uses the public `ginkgotoxin-ms-positive.raw` sample from `HegemanLab/small-thermo-raw-file-examples`, which currently reports:
+
+```text
+Scan count: 90
 ```
 
 ## Requirements
-- Windows x64
-- .NET 9 runtime
-- Visual Studio 2022 (to compile)
-- ThermoFisher.CommonCore DLLs (from NuGet: ThermoFisher.CommonCore.RawFileReader)
-
-## Build
-```
-MSBuild ThermoWrapper.sln /p:Configuration=Release /p:Platform=x64
-```
-
-## Test (Python)
-```python
-import pythonnet
-pythonnet.load("coreclr")
-import clr, sys
-sys.path.append(r"path\to\dlls")
-clr.AddReference("ThermoWrapper")
-from ThermoWrapper import RawBridge
-
-count = RawBridge.GetScanCount(r"path\to\file.raw")
-scan = RawBridge.GetScan(r"path\to\file.raw", 1)
-print(scan.Masses, scan.Intensities)
-```
+- Linux x64
+- .NET SDK with the Linux `nethost` pack installed
+- A C++17 compiler
+- Network access to `raw.githubusercontent.com` and `api.nuget.org`
 
 ## Status
-- [x] Windows x64 - Working
-- [ ] Linux - In progress
-- [ ] macOS - Planned
+- [x] Linux x64 host build
+- [x] .NET 8 embedding
+- [x] `GetScanCount` bridge

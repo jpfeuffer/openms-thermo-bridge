@@ -1,12 +1,46 @@
- - name: Download ThermoFisher DLLs from GitHub
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-build-and-run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build native host and managed bridge
+        run: bash "${GITHUB_WORKSPACE}/build_linux.sh"
+
+      - name: Download sample RAW file
         run: |
-          mkdir -p libs
-          curl -L -o libs/ThermoFisher.CommonCore.RawFileReader.dll \
-            "https://github.com/thermofisherlsms/RawFileReader/raw/main/Libs/Net8/ThermoFisher.CommonCore.RawFileReader.dll"
-          curl -L -o libs/ThermoFisher.CommonCore.Data.dll \
-            "https://github.com/thermofisherlsms/RawFileReader/raw/main/Libs/Net8/ThermoFisher.CommonCore.Data.dll"
-          curl -L -o libs/ThermoFisher.CommonCore.MassPrecisionEstimator.dll \
-            "https://github.com/thermofisherlsms/RawFileReader/raw/main/Libs/Net8/ThermoFisher.CommonCore.MassPrecisionEstimator.dll"
-          ls -lh libs/
-          # Verify DLLs are real .NET assemblies and not HTML error pages
-          file libs/*.dll
+          mkdir -p /tmp/openms-thermo-bridge-samples
+          curl -fsSL \
+            https://raw.githubusercontent.com/HegemanLab/small-thermo-raw-file-examples/cfac6a25b44913273dd458d5f5db9b20b0c1107d/ginkgotoxin-ms-positive.raw \
+            -o /tmp/openms-thermo-bridge-samples/ginkgotoxin-ms-positive.raw
+
+      - name: Verify missing file handling
+        run: |
+          set +e
+          output=$("${GITHUB_WORKSPACE}/artifacts/publish/thermo_host" /tmp/openms-thermo-bridge-samples/does-not-exist.raw 2>/tmp/openms-thermo-bridge-samples/missing.stderr)
+          status=$?
+          set -e
+          test "${status}" -eq 1
+          test -z "${output}"
+          grep -q "Could not open RAW file" /tmp/openms-thermo-bridge-samples/missing.stderr
+
+      - name: Verify scan count on sample RAW file
+        run: |
+          output=$("${GITHUB_WORKSPACE}/artifacts/publish/thermo_host" /tmp/openms-thermo-bridge-samples/ginkgotoxin-ms-positive.raw)
+          test "${output}" = "Scan count: 90"
