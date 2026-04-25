@@ -252,8 +252,10 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
         throw bridge_error("load_assembly_and_get_function_pointer failed with code " + std::to_string(rc));
     }
 
-    const std::string utf8_path = raw_file_path.u8string();
-    const int scan_count = get_scan_count_entry(const_cast<char*>(utf8_path.c_str()));
+    const auto utf8_string = raw_file_path.u8string();
+    std::vector<char> utf8_path(utf8_string.begin(), utf8_string.end());
+    utf8_path.push_back('\0');
+    const int scan_count = get_scan_count_entry(utf8_path.data());
     if (scan_count == -1)
     {
         throw bridge_error("Could not open RAW file");
