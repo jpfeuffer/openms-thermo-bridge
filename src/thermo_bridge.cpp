@@ -435,6 +435,10 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
     {
         throw bridge_error("Could not open RAW file");
     }
+    if (scan_count == -3)
+    {
+        throw bridge_error("Thermo RawFileReader is not supported on this platform");
+    }
     if (scan_count < 0)
     {
         throw bridge_error("Managed bridge failed while reading RAW file (code " + std::to_string(scan_count) + ")");

@@ -47,5 +47,20 @@ TEST_CASE("The public sample RAW file reports the expected scan count")
     }
 
     REQUIRE(std::filesystem::exists(sample_path));
-    CHECK(openms::thermo_bridge::get_scan_count(sample_path) == OPENMS_THERMO_BRIDGE_TEST_EXPECTED_SCAN_COUNT);
+
+    try
+    {
+        const int count = openms::thermo_bridge::get_scan_count(sample_path);
+        CHECK(count == OPENMS_THERMO_BRIDGE_TEST_EXPECTED_SCAN_COUNT);
+    }
+    catch (const openms::thermo_bridge::bridge_error& e)
+    {
+        const std::string msg = e.what();
+        std::cerr << "[test] bridge_error: " << msg << "\n";
+        if (msg.find("not supported on this platform") != std::string::npos)
+        {
+            SKIP("Thermo RawFileReader is not supported on this platform");
+        }
+        FAIL(msg);
+    }
 }
