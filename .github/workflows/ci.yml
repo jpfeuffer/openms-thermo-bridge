@@ -27,6 +27,18 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Debug .NET environment
+        shell: bash
+        run: |
+          echo "=== dotnet --info ==="
+          dotnet --info || true
+          echo "=== DOTNET_ROOT ==="
+          echo "DOTNET_ROOT=${DOTNET_ROOT:-<not set>}"
+          echo "=== .NET packs ==="
+          if [ -d "${DOTNET_ROOT:-/usr/share/dotnet}/packs" ]; then
+            find "${DOTNET_ROOT:-/usr/share/dotnet}/packs" -maxdepth 4 -name 'nethost*' -o -name 'libnethost*' 2>/dev/null | head -30 || true
+          fi
+
       - name: Configure
         shell: bash
         run: |
@@ -37,6 +49,22 @@ jobs:
       - name: Build
         shell: bash
         run: cmake --build "${GITHUB_WORKSPACE}/build" --config Release --parallel
+
+      - name: Debug runtime files
+        shell: bash
+        run: |
+          echo "=== Managed directory ==="
+          ls -la "${GITHUB_WORKSPACE}/build/openms_thermo_bridge_managed/" 2>/dev/null || echo "managed dir not found"
+          echo "=== Test executable directory ==="
+          if [ -d "${GITHUB_WORKSPACE}/build/Release" ]; then
+            ls -la "${GITHUB_WORKSPACE}/build/Release/" 2>/dev/null || true
+            ls -la "${GITHUB_WORKSPACE}/build/Release/managed/" 2>/dev/null || true
+          else
+            ls -la "${GITHUB_WORKSPACE}/build/" 2>/dev/null | head -20 || true
+            ls -la "${GITHUB_WORKSPACE}/build/managed/" 2>/dev/null || true
+          fi
+          echo "=== Test executable exists ==="
+          find "${GITHUB_WORKSPACE}/build" -name 'thermo_bridge_tests*' -type f 2>/dev/null | head -5 || true
 
       - name: Run tests
         shell: bash

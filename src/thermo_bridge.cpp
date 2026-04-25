@@ -196,7 +196,22 @@ std::filesystem::path default_managed_directory()
 
 int get_scan_count(const std::filesystem::path& raw_file_path)
 {
-    return get_scan_count(raw_file_path, default_managed_directory());
+    try
+    {
+        return get_scan_count(raw_file_path, default_managed_directory());
+    }
+    catch (const bridge_error&)
+    {
+        throw;
+    }
+    catch (const std::exception& e)
+    {
+        throw bridge_error(std::string("Thermo bridge internal error: ") + e.what());
+    }
+    catch (...)
+    {
+        throw bridge_error("Thermo bridge failed with an unknown internal error");
+    }
 }
 
 int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesystem::path& managed_directory)
@@ -209,7 +224,20 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
         throw bridge_error("Managed bridge runtime files are missing. Copy the managed directory next to your executable.");
     }
 
-    const library_handle hostfxr_library = load_library(hostfxr_path());
+    library_handle hostfxr_library = nullptr;
+    try
+    {
+        hostfxr_library = load_library(hostfxr_path());
+    }
+    catch (const bridge_error&)
+    {
+        throw;
+    }
+    catch (...)
+    {
+        throw bridge_error("Failed to load hostfxr library (unknown error)");
+    }
+
     auto hostfxr_initialize = reinterpret_cast<hostfxr_initialize_for_runtime_config_fn>(
         get_export(hostfxr_library, "hostfxr_initialize_for_runtime_config"));
     auto hostfxr_get_delegate = reinterpret_cast<hostfxr_get_runtime_delegate_fn>(
@@ -219,17 +247,39 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
 
     hostfxr_handle context = nullptr;
     const auto runtime_config_native = to_char_t_path(runtime_config);
-    int rc = hostfxr_initialize(runtime_config_native.c_str(), nullptr, &context);
-    if (rc != 0 || context == nullptr)
+    int rc = 0;
+    try
+    {
+        rc = hostfxr_initialize(runtime_config_native.c_str(), nullptr, &context);
+    }
+    catch (...)
+    {
+        throw bridge_error("hostfxr_initialize_for_runtime_config threw an unexpected exception");
+    }
+    // Return codes: 0 = Success, 1 = Success_HostAlreadyInitialized,
+    // 2 = Success_DifferentRuntimeProperties.  Only negative values are errors.
+    if (rc < 0)
     {
         throw bridge_error("hostfxr_initialize_for_runtime_config failed with code " + std::to_string(rc));
     }
+    if (context == nullptr)
+    {
+        throw bridge_error("hostfxr_initialize_for_runtime_config returned null context (code " + std::to_string(rc) + ")");
+    }
 
     load_assembly_and_get_function_pointer_fn load_assembly = nullptr;
-    rc = hostfxr_get_delegate(
-        context,
-        hdt_load_assembly_and_get_function_pointer,
-        reinterpret_cast<void**>(&load_assembly));
+    try
+    {
+        rc = hostfxr_get_delegate(
+            context,
+            hdt_load_assembly_and_get_function_pointer,
+            reinterpret_cast<void**>(&load_assembly));
+    }
+    catch (...)
+    {
+        hostfxr_close(context);
+        throw bridge_error("hostfxr_get_runtime_delegate threw an unexpected exception");
+    }
     hostfxr_close(context);
 
     if (rc != 0 || load_assembly == nullptr)
@@ -239,13 +289,20 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
 
     get_scan_count_fn get_scan_count_entry = nullptr;
     const auto assembly_path_native = to_char_t_path(assembly_path);
-    rc = load_assembly(
-        assembly_path_native.c_str(),
-        OPENMS_THERMO_BRIDGE_CHAR_T_LITERAL("ThermoWrapperManaged.RawBridge, ThermoWrapperManaged"),
-        OPENMS_THERMO_BRIDGE_CHAR_T_LITERAL("GetScanCount"),
-        UNMANAGEDCALLERSONLY_METHOD,
-        nullptr,
-        reinterpret_cast<void**>(&get_scan_count_entry));
+    try
+    {
+        rc = load_assembly(
+            assembly_path_native.c_str(),
+            OPENMS_THERMO_BRIDGE_CHAR_T_LITERAL("ThermoWrapperManaged.RawBridge, ThermoWrapperManaged"),
+            OPENMS_THERMO_BRIDGE_CHAR_T_LITERAL("GetScanCount"),
+            UNMANAGEDCALLERSONLY_METHOD,
+            nullptr,
+            reinterpret_cast<void**>(&get_scan_count_entry));
+    }
+    catch (...)
+    {
+        throw bridge_error("load_assembly_and_get_function_pointer threw an unexpected exception");
+    }
 
     if (rc != 0 || get_scan_count_entry == nullptr)
     {
@@ -255,7 +312,17 @@ int get_scan_count(const std::filesystem::path& raw_file_path, const std::filesy
     const auto utf8_string = raw_file_path.u8string();
     std::vector<char> utf8_path(utf8_string.begin(), utf8_string.end());
     utf8_path.push_back('\0');
-    const int scan_count = get_scan_count_entry(utf8_path.data());
+
+    int scan_count = 0;
+    try
+    {
+        scan_count = get_scan_count_entry(utf8_path.data());
+    }
+    catch (...)
+    {
+        throw bridge_error("Managed GetScanCount threw an unexpected exception");
+    }
+
     if (scan_count == -1)
     {
         throw bridge_error("Could not open RAW file");

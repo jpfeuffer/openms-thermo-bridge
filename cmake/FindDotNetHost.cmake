@@ -94,13 +94,14 @@ find_package_handle_standard_args(DotNetHost
   FAIL_MESSAGE "Could not locate the .NET nethost SDK pack for ${_dotnet_host_rid}")
 
 if(DotNetHost_FOUND AND NOT TARGET DotNetHost::nethost)
-  add_library(DotNetHost::nethost UNKNOWN IMPORTED)
   if(WIN32 AND DotNetHost_RUNTIME_LIBRARY)
+    add_library(DotNetHost::nethost SHARED IMPORTED)
     set_target_properties(DotNetHost::nethost PROPERTIES
       IMPORTED_IMPLIB "${DotNetHost_LIBRARY}"
       IMPORTED_LOCATION "${DotNetHost_RUNTIME_LIBRARY}"
       INTERFACE_INCLUDE_DIRECTORIES "${DotNetHost_INCLUDE_DIR}")
   else()
+    add_library(DotNetHost::nethost UNKNOWN IMPORTED)
     set_target_properties(DotNetHost::nethost PROPERTIES
       IMPORTED_LOCATION "${DotNetHost_LIBRARY}"
       INTERFACE_INCLUDE_DIRECTORIES "${DotNetHost_INCLUDE_DIR}")
