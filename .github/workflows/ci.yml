@@ -33,11 +33,12 @@ jobs:
       - name: Verify missing file handling
         run: |
           set +e
-          output=$("${GITHUB_WORKSPACE}/artifacts/publish/thermo_host" /tmp/openms-thermo-bridge-samples/does-not-exist.raw)
+          output=$("${GITHUB_WORKSPACE}/artifacts/publish/thermo_host" /tmp/openms-thermo-bridge-samples/does-not-exist.raw 2>/tmp/openms-thermo-bridge-samples/missing.stderr)
           status=$?
           set -e
           test "${status}" -eq 1
           test "${output}" = "Scan count: -1"
+          grep -q "Could not open RAW file" /tmp/openms-thermo-bridge-samples/missing.stderr
 
       - name: Verify scan count on sample RAW file
         run: |

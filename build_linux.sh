@@ -34,7 +34,13 @@ dotnet publish \
   --source "${vendor_dir}" \
   --source "${dotnet_source}"
 
-nethost_base="$(find /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64 -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+nethost_pack_root="/usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64"
+if [[ ! -d "${nethost_pack_root}" ]]; then
+  echo "Could not locate ${nethost_pack_root}" >&2
+  exit 1
+fi
+
+nethost_base="$(find "${nethost_pack_root}" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
 if [[ -z "${nethost_base}" ]]; then
   echo "Could not locate Microsoft.NETCore.App.Host.linux-x64 in /usr/share/dotnet/packs" >&2
   exit 1
