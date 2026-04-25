@@ -1,6 +1,7 @@
 #include <openms_thermo_bridge/thermo_bridge.hpp>
 
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <utility>
@@ -66,12 +67,16 @@ std::filesystem::path executable_path()
         buffer.resize(buffer.size() * 2);
     }
 #elif defined(__APPLE__)
-    uint32_t size = 0;
-    _NSGetExecutablePath(nullptr, &size);
-    std::vector<char> buffer(size);
+    std::uint32_t size = 0;
+    std::vector<char> buffer(1024);
+    size = static_cast<std::uint32_t>(buffer.size());
     if (_NSGetExecutablePath(buffer.data(), &size) != 0)
     {
-        throw bridge_error("Unable to resolve executable path");
+        buffer.resize(size);
+        if (_NSGetExecutablePath(buffer.data(), &size) != 0)
+        {
+            throw bridge_error("Unable to resolve executable path");
+        }
     }
     return std::filesystem::weakly_canonical(std::filesystem::path(buffer.data()));
 #elif defined(__linux__)

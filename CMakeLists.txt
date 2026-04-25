@@ -21,10 +21,17 @@ option(OPENMS_THERMO_BRIDGE_DOWNLOAD_TEST_DATA "Download public sample RAW data 
 
 set(OPENMS_THERMO_BRIDGE_MANAGED_DIR "${CMAKE_CURRENT_BINARY_DIR}/openms_thermo_bridge_managed")
 set(OPENMS_THERMO_BRIDGE_TEST_DATA_DIR "${CMAKE_CURRENT_BINARY_DIR}/testdata")
+set(OPENMS_THERMO_BRIDGE_NUGET_CONFIG "${CMAKE_CURRENT_BINARY_DIR}/OpenMSThermoBridge.NuGet.config")
 set(OPENMS_THERMO_BRIDGE_MANAGED_FILES
     "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}/ThermoWrapperManaged.dll"
     "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}/ThermoWrapperManaged.runtimeconfig.json")
 set(OpenMSThermoBridge_MANAGED_DIR "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}" CACHE INTERNAL "Managed runtime directory for OpenMSThermoBridge.")
+
+file(TO_CMAKE_PATH "${OPENMS_THERMO_BRIDGE_VENDOR_DIR}" OPENMS_THERMO_BRIDGE_VENDOR_DIR_CMAKE_PATH)
+file(CONFIGURE
+  OUTPUT "${OPENMS_THERMO_BRIDGE_NUGET_CONFIG}"
+  CONTENT "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<configuration>\n  <packageSources>\n    <clear />\n    <add key=\"openms-thermo-bridge-vendor\" value=\"@OPENMS_THERMO_BRIDGE_VENDOR_DIR_CMAKE_PATH@\" />\n    <add key=\"nuget.org\" value=\"https://api.nuget.org/v3/index.json\" />\n  </packageSources>\n</configuration>\n"
+  @ONLY)
 
 include(OpenMSThermoBridgeFunctions)
 
@@ -53,11 +60,11 @@ add_custom_command(
           --nologo
           --self-contained false
           -o "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}"
-          --source "${OPENMS_THERMO_BRIDGE_VENDOR_DIR}"
-          --source "https://api.nuget.org/v3/index.json"
+          --configfile "${OPENMS_THERMO_BRIDGE_NUGET_CONFIG}"
   DEPENDS openms_thermo_bridge_vendor_packages
           "${CMAKE_CURRENT_SOURCE_DIR}/ThermoWrapperManaged.csproj"
           "${CMAKE_CURRENT_SOURCE_DIR}/ThermoWrapperManaged.cs"
+          "${OPENMS_THERMO_BRIDGE_NUGET_CONFIG}"
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
   COMMENT "Publishing managed Thermo bridge"
   VERBATIM)
