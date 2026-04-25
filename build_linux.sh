@@ -6,6 +6,7 @@ vendor_dir="${repo_root}/vendor/thermo-feed"
 publish_dir="${repo_root}/artifacts/publish"
 managed_dir="${publish_dir}/managed"
 dotnet_source="https://api.nuget.org/v3/index.json"
+# Pinned to the upstream Net8 package snapshot used to verify the working Linux sample run.
 thermo_commit="db08ff32cbb626d259b6d4d98492c83d6f2f6871"
 
 mkdir -p "${vendor_dir}" "${managed_dir}"

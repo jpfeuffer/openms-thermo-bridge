@@ -122,7 +122,6 @@ int main(int argc, char* argv[])
         }
 
         const int scan_count = get_scan_count(argv[1]);
-        std::cout << "Scan count: " << scan_count << '\n';
 
         if (scan_count < 0)
         {
@@ -138,6 +137,7 @@ int main(int argc, char* argv[])
             return 1;
         }
 
+        std::cout << "Scan count: " << scan_count << '\n';
         return 0;
     }
     catch (const std::exception& error)
