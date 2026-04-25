@@ -1,4 +1,6 @@
 artifacts/
+build/
+install/
 vendor/
 bin/
 obj/

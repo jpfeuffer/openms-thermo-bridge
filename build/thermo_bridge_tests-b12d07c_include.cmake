@@ -1,5 +1,0 @@
-if(EXISTS "/home/runner/work/openms-thermo-bridge/openms-thermo-bridge/build/thermo_bridge_tests-b12d07c_tests.cmake")
-  include("/home/runner/work/openms-thermo-bridge/openms-thermo-bridge/build/thermo_bridge_tests-b12d07c_tests.cmake")
-else()
-  add_test(thermo_bridge_tests_NOT_BUILT-b12d07c thermo_bridge_tests_NOT_BUILT-b12d07c)
-endif()
