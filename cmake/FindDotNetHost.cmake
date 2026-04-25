@@ -106,7 +106,11 @@ endforeach()
 
 find_package_handle_standard_args(DotNetHost
   REQUIRED_VARS DotNetHost_INCLUDE_DIR DotNetHost_LIBRARY
-  FAIL_MESSAGE "Could not locate the .NET nethost SDK pack for ${_dotnet_host_rid}. For the Apple Silicon Rosetta workaround, install an osx-x64 .NET SDK/runtime and set DOTNET_ROOT_X64 (or DOTNET_ROOT) to that x64 installation.")
+  FAIL_MESSAGE [=[
+Could not locate the .NET nethost SDK pack for ${_dotnet_host_rid}.
+For the Apple Silicon Rosetta workaround, install an osx-x64 .NET SDK/runtime
+and set DOTNET_ROOT_X64 (or DOTNET_ROOT) to that x64 installation.
+]=])
 
 if(DotNetHost_FOUND AND NOT TARGET DotNetHost::nethost)
   if(WIN32 AND DotNetHost_RUNTIME_LIBRARY)
