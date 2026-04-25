@@ -25,7 +25,7 @@ ThermoFisher.CommonCore.RawFileReader
 
 ## Build
 ```bash
-/home/runner/work/openms-thermo-bridge/openms-thermo-bridge/build_linux.sh
+./build_linux.sh
 ```
 
 This produces:
@@ -38,7 +38,7 @@ artifacts/publish/managed/ThermoWrapperManaged.runtimeconfig.json
 
 ## Run
 ```bash
-/home/runner/work/openms-thermo-bridge/openms-thermo-bridge/artifacts/publish/thermo_host /path/to/file.raw
+./artifacts/publish/thermo_host /path/to/file.raw
 ```
 
 Expected output:

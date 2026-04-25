@@ -121,7 +121,7 @@ int main(int argc, char* argv[])
             throw std::runtime_error("load_assembly_and_get_function_pointer failed with code " + std::to_string(rc));
         }
 
-        const int scan_count = get_scan_count(argv[1]);
+        const int scan_count = get_scan_count(reinterpret_cast<void*>(argv[1]));
         std::cout << "Scan count: " << scan_count << '\n';
         return scan_count >= 0 ? 0 : 1;
     }

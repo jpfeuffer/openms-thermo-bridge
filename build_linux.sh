@@ -34,7 +34,17 @@ dotnet publish \
   --source "${vendor_dir}" \
   --source "${dotnet_source}"
 
-nethost_dir="$(find /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64 -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)/runtimes/linux-x64/native"
+nethost_base="$(find /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64 -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+if [[ -z "${nethost_base}" ]]; then
+  echo "Could not locate Microsoft.NETCore.App.Host.linux-x64 in /usr/share/dotnet/packs" >&2
+  exit 1
+fi
+
+nethost_dir="${nethost_base}/runtimes/linux-x64/native"
+if [[ ! -d "${nethost_dir}" ]]; then
+  echo "Could not locate nethost native directory: ${nethost_dir}" >&2
+  exit 1
+fi
 
 g++ \
   -std=c++17 \
