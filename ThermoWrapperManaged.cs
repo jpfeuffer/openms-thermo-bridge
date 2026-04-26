@@ -22,17 +22,6 @@ namespace ThermoWrapperManaged
                 string? filePath = Marshal.PtrToStringUTF8(filePathPtr);
                 if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return -1;
 
-                // The Thermo RawFileReader native components only support
-                // Windows and Linux.  On other platforms (macOS), calling into
-                // the library causes a native crash.  Guard here so that the
-                // JIT compiler never needs to resolve Thermo types on
-                // unsupported platforms (they live in GetScanCountImpl).
-                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
-                    !RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                {
-                    return -3;
-                }
-
                 return GetScanCountImpl(filePath);
             }
             catch (Exception)
