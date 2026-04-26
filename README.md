@@ -17,7 +17,7 @@ Thermo RawFileReader currently works in this repository on Apple Silicon macOS o
 
 This workaround trades correctness for native performance: expect slower startup and RAW access under emulation. You can disable it with `-DOPENMS_THERMO_BRIDGE_OSX_ARM64_X64_WORKAROUND=OFF`, but current upstream Thermo packages are known to fail as native `osx-arm64` builds.
 
-You also need an `osx-x64` .NET 8 SDK/runtime available to the build and the final executable. If it is not the default `dotnet` installation on your machine, set `DOTNET_ROOT_X64=/absolute/path/to/x64/dotnet` (or `DOTNET_ROOT`) so CMake and the embedded hostfxr loader can find the matching x64 `nethost` and runtime files.
+You also need an `osx-x64` .NET 8 SDK/runtime available for both the build and the final executable. If it is not the default `dotnet` installation on your machine, set `DOTNET_ROOT_X64=/absolute/path/to/x64/dotnet` (or `DOTNET_ROOT`) so CMake and the embedded hostfxr loader can find the matching x64 `nethost` and runtime files.
 
 If Apple Silicon support matters to you, please track or upvote the upstream report at https://github.com/thermofisherlsms/RawFileReader/issues/3?issue=fgcz%7Crawrr%7C75 and consider contacting Thermo support to request native `osx-arm64` binaries.
 
