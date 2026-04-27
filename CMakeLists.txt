@@ -108,7 +108,7 @@ add_custom_command(
 
 add_custom_target(openms_thermo_bridge_managed ALL DEPENDS ${OPENMS_THERMO_BRIDGE_MANAGED_FILES})
 
-add_library(openms_thermo_bridge src/thermo_bridge.cpp)
+add_library(openms_thermo_bridge src/thermo_bridge.cpp src/cv_mapping.cpp)
 add_library(OpenMSThermoBridge::openms_thermo_bridge ALIAS openms_thermo_bridge)
 
 target_compile_features(openms_thermo_bridge PUBLIC cxx_std_17)
@@ -163,8 +163,13 @@ if(BUILD_TESTING)
     OPENMS_THERMO_BRIDGE_TEST_EXPECTED_SCAN_COUNT=90)
   openms_thermo_bridge_copy_runtime_files(TARGET thermo_bridge_tests)
 
+  add_executable(cv_mapping_tests tests/test_cv_mapping.cpp)
+  target_compile_features(cv_mapping_tests PRIVATE cxx_std_17)
+  target_link_libraries(cv_mapping_tests PRIVATE openms_thermo_bridge Catch2::Catch2WithMain)
+
   include(Catch)
   catch_discover_tests(thermo_bridge_tests)
+  catch_discover_tests(cv_mapping_tests)
 endif()
 
 install(TARGETS openms_thermo_bridge EXPORT OpenMSThermoBridgeTargets
