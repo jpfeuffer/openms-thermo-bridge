@@ -8,7 +8,7 @@
 using namespace openms::thermo_bridge;
 
 // ================================================================
-//  Instrument model → PSI-MS accession
+//  Instrument model -> PSI-MS accession
 // ================================================================
 
 TEST_CASE("cv_instrument_model: exact LTQ Orbitrap match")
@@ -22,7 +22,7 @@ TEST_CASE("cv_instrument_model: exact LTQ Orbitrap match")
 TEST_CASE("cv_instrument_model: partial match (model with extra text)")
 {
     // Mirrors ThermoRawFileParser's OntologyMappingTests.cs:
-    // "LTQ Orbitrap XXL" → longest prefix "LTQ Orbitrap" → MS:1000449
+    // "LTQ Orbitrap XXL" -> longest prefix "LTQ Orbitrap" -> MS:1000449
     auto t = cv_instrument_model("LTQ Orbitrap XXL");
     CHECK(t.accession == "MS:1000449");
 }
@@ -215,7 +215,7 @@ TEST_CASE("cv_instrument_model: DeltaPlus")
 }
 
 // ================================================================
-//  Mass analyzer → PSI-MS accession
+//  Mass analyzer -> PSI-MS accession
 // ================================================================
 
 TEST_CASE("cv_mass_analyzer: FTMS with Orbitrap instrument -> Orbitrap")
@@ -299,7 +299,7 @@ TEST_CASE("cv_mass_analyzer: unknown -> generic fallback")
 }
 
 // ================================================================
-//  Ionization mode → PSI-MS accession
+//  Ionization mode -> PSI-MS accession
 // ================================================================
 
 TEST_CASE("cv_ionization_mode: ElectroSpray")
@@ -345,7 +345,7 @@ TEST_CASE("cv_ionization_mode: unknown -> generic fallback")
 }
 
 // ================================================================
-//  Activation / dissociation → PSI-MS accession
+//  Activation / dissociation -> PSI-MS accession
 // ================================================================
 
 TEST_CASE("cv_activation_type: CID")

@@ -35,11 +35,11 @@ struct CVParam
 };
 
 // ================================================================
-//  Instrument model → PSI-MS accession
+//  Instrument model -> PSI-MS accession
 //
 //  Ported from ThermoRawFileParser Writer/OntologyMapping.cs
 //  GetInstrumentModel().  The lookup tries longest-prefix matching
-//  so that e.g. "LTQ Orbitrap XXL" matches "LTQ Orbitrap" → MS:1000449.
+//  so that e.g. "LTQ Orbitrap XXL" matches "LTQ Orbitrap" -> MS:1000449.
 // ================================================================
 
 /// Map a Thermo instrument model string to a PSI-MS accession + name.
@@ -47,7 +47,7 @@ struct CVParam
 CVTerm cv_instrument_model(const std::string& model);
 
 // ================================================================
-//  Mass analyzer → PSI-MS accession
+//  Mass analyzer -> PSI-MS accession
 //
 //  The input is the Thermo MassAnalyzerType enum .ToString() value
 //  as returned by RawFile::mass_analyzer_type().
@@ -59,19 +59,19 @@ CVTerm cv_mass_analyzer(const std::string& analyzer_type,
                         const std::string& instrument_model = {});
 
 // ================================================================
-//  Ionization mode → PSI-MS accession
+//  Ionization mode -> PSI-MS accession
 // ================================================================
 
 CVTerm cv_ionization_mode(const std::string& ionization_type);
 
 // ================================================================
-//  Activation / dissociation type → PSI-MS accession
+//  Activation / dissociation type -> PSI-MS accession
 // ================================================================
 
 CVTerm cv_activation_type(const std::string& activation_type);
 
 // ================================================================
-//  Detector type for an instrument model → PSI-MS accession(s)
+//  Detector type for an instrument model -> PSI-MS accession(s)
 //
 //  Some instruments have multiple detectors (e.g. Orbitrap ID-X).
 // ================================================================
