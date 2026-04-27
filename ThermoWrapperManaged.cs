@@ -756,7 +756,7 @@ namespace ThermoWrapperManaged
             var settings = new ChromatogramTraceSettings(TraceType.MassRange)
             {
                 Filter = "ms",
-                MassRanges = new[] { new Range(mzStart, mzEnd) }
+                MassRanges = new[] { new ThermoFisher.CommonCore.Data.Business.Range(mzStart, mzEnd) }
             };
             int first = rf.RunHeaderEx.FirstSpectrum;
             int last = rf.RunHeaderEx.LastSpectrum;
@@ -798,7 +798,7 @@ namespace ThermoWrapperManaged
             var settings = new ChromatogramTraceSettings(TraceType.MassRange)
             {
                 Filter = "ms",
-                MassRanges = new[] { new Range(mzStart, mzEnd) }
+                MassRanges = new[] { new ThermoFisher.CommonCore.Data.Business.Range(mzStart, mzEnd) }
             };
             int first = rf.RunHeaderEx.FirstSpectrum;
             int last = rf.RunHeaderEx.LastSpectrum;

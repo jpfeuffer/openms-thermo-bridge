@@ -213,7 +213,9 @@ void warn_about_emulation_if_needed()
         {
             std::cerr
                 << "[thermo_bridge] warning: running through Rosetta because Thermo RawFileReader does not yet have "
-                   "native osx-arm64 support. Expect slower performance under emulation.\n";
+                   "native osx-arm64 support. Expect slower performance under emulation. Track "
+                   "https://github.com/thermofisherlsms/RawFileReader/issues/3?issue=fgcz%7Crawrr%7C75 and contact "
+                   "Thermo support if native Apple Silicon support is important for your workflow.\n";
         }
     });
 #endif
@@ -327,10 +329,11 @@ public:
         const auto assembly_path_native = to_char_t_path(assembly_path_);
 
         // Convert entry_point_name to char_t string at runtime.
+        // Entry point names are C# method identifiers, guaranteed ASCII.
 #if defined(_WIN32)
         std::wstring entry_wide;
         for (const char* p = entry_point_name; *p; ++p)
-            entry_wide.push_back(static_cast<wchar_t>(*p));
+            entry_wide.push_back(static_cast<wchar_t>(static_cast<unsigned char>(*p)));
         const char_t* entry_native = entry_wide.c_str();
 #else
         const char_t* entry_native = entry_point_name;
