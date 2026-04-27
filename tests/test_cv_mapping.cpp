@@ -218,38 +218,38 @@ TEST_CASE("cv_instrument_model: DeltaPlus")
 //  Mass analyzer → PSI-MS accession
 // ================================================================
 
-TEST_CASE("cv_mass_analyzer: FTMS with Orbitrap instrument → Orbitrap")
+TEST_CASE("cv_mass_analyzer: FTMS with Orbitrap instrument -> Orbitrap")
 {
     auto t = cv_mass_analyzer("MassAnalyzerFTMS", "Orbitrap Fusion Lumos");
     CHECK(t.accession == "MS:1000484");
     CHECK(t.name == "orbitrap");
 }
 
-TEST_CASE("cv_mass_analyzer: FTMS with Exactive instrument → Orbitrap")
+TEST_CASE("cv_mass_analyzer: FTMS with Exactive instrument -> Orbitrap")
 {
     auto t = cv_mass_analyzer("MassAnalyzerFTMS", "Q Exactive HF");
     CHECK(t.accession == "MS:1000484");
 }
 
-TEST_CASE("cv_mass_analyzer: FTMS with Exploris instrument → Orbitrap")
+TEST_CASE("cv_mass_analyzer: FTMS with Exploris instrument -> Orbitrap")
 {
     auto t = cv_mass_analyzer("MassAnalyzerFTMS", "Orbitrap Exploris 480");
     CHECK(t.accession == "MS:1000484");
 }
 
-TEST_CASE("cv_mass_analyzer: FTMS with Astral instrument → Orbitrap")
+TEST_CASE("cv_mass_analyzer: FTMS with Astral instrument -> Orbitrap")
 {
     auto t = cv_mass_analyzer("MassAnalyzerFTMS", "Orbitrap Astral");
     CHECK(t.accession == "MS:1000484");
 }
 
-TEST_CASE("cv_mass_analyzer: FTMS with FT instrument → FT-ICR")
+TEST_CASE("cv_mass_analyzer: FTMS with FT instrument -> FT-ICR")
 {
     auto t = cv_mass_analyzer("MassAnalyzerFTMS", "LTQ FT Ultra");
     CHECK(t.accession == "MS:1000079");
 }
 
-TEST_CASE("cv_mass_analyzer: FTMS without model → FT-ICR fallback")
+TEST_CASE("cv_mass_analyzer: FTMS without model -> FT-ICR fallback")
 {
     auto t = cv_mass_analyzer("MassAnalyzerFTMS");
     CHECK(t.accession == "MS:1000079");
@@ -292,7 +292,7 @@ TEST_CASE("cv_mass_analyzer: Astral (ASTMS)")
     CHECK(t.accession == "MS:1003379");
 }
 
-TEST_CASE("cv_mass_analyzer: unknown → generic fallback")
+TEST_CASE("cv_mass_analyzer: unknown -> generic fallback")
 {
     auto t = cv_mass_analyzer("SomethingUnknown");
     CHECK(t.accession == "MS:1000443");
@@ -338,7 +338,7 @@ TEST_CASE("cv_ionization_mode: EI")
     CHECK(t.accession == "MS:1000389");
 }
 
-TEST_CASE("cv_ionization_mode: unknown → generic fallback")
+TEST_CASE("cv_ionization_mode: unknown -> generic fallback")
 {
     auto t = cv_ionization_mode("UnknownMode");
     CHECK(t.accession == "MS:1000008");
@@ -403,7 +403,7 @@ TEST_CASE("cv_activation_type: PTR")
     CHECK(t.accession == "MS:1003249");
 }
 
-TEST_CASE("cv_activation_type: unknown → generic fallback")
+TEST_CASE("cv_activation_type: unknown -> generic fallback")
 {
     auto t = cv_activation_type("SomethingElse");
     CHECK(t.accession == "MS:1000044");
@@ -482,7 +482,7 @@ TEST_CASE("cv_detector_types: DeltaPlus has faraday cup")
     CHECK(has_faraday);
 }
 
-TEST_CASE("cv_detector_types: unknown instrument → empty")
+TEST_CASE("cv_detector_types: unknown instrument -> empty")
 {
     auto dets = cv_detector_types("Unknown Instrument Model 9000");
     CHECK(dets.empty());
