@@ -8,39 +8,103 @@ permissions:
   contents: read
 
 jobs:
-  linux-build-and-run:
-    runs-on: ubuntu-latest
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Set up .NET 8 SDK
+        if: runner.os != 'macOS'
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
 
-      - name: Build native host and managed bridge
-        run: bash "${GITHUB_WORKSPACE}/build_linux.sh"
-
-      - name: Download sample RAW file
+      - name: Install .NET 8 SDK (macOS x64 workaround)
+        if: runner.os == 'macOS'
+        shell: bash
         run: |
-          mkdir -p /tmp/openms-thermo-bridge-samples
-          curl -fsSL \
-            https://raw.githubusercontent.com/HegemanLab/small-thermo-raw-file-examples/cfac6a25b44913273dd458d5f5db9b20b0c1107d/ginkgotoxin-ms-positive.raw \
-            -o /tmp/openms-thermo-bridge-samples/ginkgotoxin-ms-positive.raw
+          curl -fsSL https://dot.net/v1/dotnet-install.sh -o "${RUNNER_TEMP}/dotnet-install.sh"
+          chmod +x "${RUNNER_TEMP}/dotnet-install.sh"
+          "${RUNNER_TEMP}/dotnet-install.sh" --channel 8.0 --architecture x64 --install-dir "${HOME}/.dotnet-x64"
+          "${HOME}/.dotnet-x64/dotnet" --info
 
-      - name: Verify missing file handling
+      - name: Configure .NET environment for macOS x64 workaround
+        if: runner.os == 'macOS'
+        shell: bash
         run: |
-          set +e
-          output=$("${GITHUB_WORKSPACE}/artifacts/publish/thermo_host" /tmp/openms-thermo-bridge-samples/does-not-exist.raw 2>/tmp/openms-thermo-bridge-samples/missing.stderr)
-          status=$?
-          set -e
-          test "${status}" -eq 1
-          test -z "${output}"
-          grep -q "Could not open RAW file" /tmp/openms-thermo-bridge-samples/missing.stderr
+          echo "${HOME}/.dotnet-x64" >> "${GITHUB_PATH}"
+          echo "DOTNET_ROOT=${HOME}/.dotnet-x64" >> "${GITHUB_ENV}"
+          echo "DOTNET_ROOT_X64=${HOME}/.dotnet-x64" >> "${GITHUB_ENV}"
+          echo "DOTNET_X64_EXECUTABLE=${HOME}/.dotnet-x64/dotnet" >> "${GITHUB_ENV}"
+          echo "DOTNET_MULTILEVEL_LOOKUP=0" >> "${GITHUB_ENV}"
 
-      - name: Verify scan count on sample RAW file
+      - name: Debug .NET environment
+        shell: bash
         run: |
-          output=$("${GITHUB_WORKSPACE}/artifacts/publish/thermo_host" /tmp/openms-thermo-bridge-samples/ginkgotoxin-ms-positive.raw)
-          test "${output}" = "Scan count: 90"
+          echo "=== which dotnet ==="
+          which dotnet || true
+          echo "=== dotnet --info ==="
+          dotnet --info || true
+          echo "=== DOTNET_ROOT ==="
+          echo "DOTNET_ROOT=${DOTNET_ROOT:-<not set>}"
+          echo "=== DOTNET_ROOT_X64 ==="
+          echo "DOTNET_ROOT_X64=${DOTNET_ROOT_X64:-<not set>}"
+          echo "=== DOTNET_X64_EXECUTABLE ==="
+          echo "DOTNET_X64_EXECUTABLE=${DOTNET_X64_EXECUTABLE:-<not set>}"
+          if [ -x "${DOTNET_X64_EXECUTABLE:-}" ]; then
+            echo "=== x64 dotnet --info ==="
+            "${DOTNET_X64_EXECUTABLE}" --info || true
+          fi
+          echo "=== .NET packs ==="
+          if [ -d "${DOTNET_ROOT:-/usr/share/dotnet}/packs" ]; then
+            find "${DOTNET_ROOT:-/usr/share/dotnet}/packs" -maxdepth 4 -name 'nethost*' -o -name 'libnethost*' 2>/dev/null | head -30 || true
+          fi
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake_args=(
+            -DOPENMS_THERMO_BRIDGE_ENABLE_VENDOR_DOWNLOAD=ON
+            -DOPENMS_THERMO_BRIDGE_DOWNLOAD_TEST_DATA=ON
+          )
+          if [ "${RUNNER_OS}" = "macOS" ]; then
+            cmake_args+=("-DDOTNET_EXECUTABLE=${DOTNET_X64_EXECUTABLE}")
+          fi
+          cmake -S "${GITHUB_WORKSPACE}" -B "${GITHUB_WORKSPACE}/build" "${cmake_args[@]}"
+
+      - name: Build
+        shell: bash
+        run: cmake --build "${GITHUB_WORKSPACE}/build" --config Release --parallel
+
+      - name: Debug runtime files
+        shell: bash
+        run: |
+          echo "=== Managed directory ==="
+          ls -la "${GITHUB_WORKSPACE}/build/openms_thermo_bridge_managed/" 2>/dev/null || echo "managed dir not found"
+          echo "=== Test executable directory ==="
+          if [ -d "${GITHUB_WORKSPACE}/build/Release" ]; then
+            ls -la "${GITHUB_WORKSPACE}/build/Release/" 2>/dev/null || true
+            ls -la "${GITHUB_WORKSPACE}/build/Release/managed/" 2>/dev/null || true
+          else
+            ls -la "${GITHUB_WORKSPACE}/build/" 2>/dev/null | head -20 || true
+            ls -la "${GITHUB_WORKSPACE}/build/managed/" 2>/dev/null || true
+          fi
+          echo "=== Test executable exists ==="
+          find "${GITHUB_WORKSPACE}/build" -name 'thermo_bridge_tests*' -type f 2>/dev/null | head -5 || true
+
+      - name: Run tests
+        shell: bash
+        run: ctest --test-dir "${GITHUB_WORKSPACE}/build" --build-config Release --output-on-failure -V
+
+      - name: Install package
+        shell: bash
+        run: cmake --install "${GITHUB_WORKSPACE}/build" --config Release --prefix "${GITHUB_WORKSPACE}/install"
