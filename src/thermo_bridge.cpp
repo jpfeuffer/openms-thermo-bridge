@@ -144,6 +144,19 @@ std::filesystem::path module_path()
 #endif
 }
 
+bool try_module_path(std::filesystem::path& result)
+{
+    try
+    {
+        result = module_path();
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
 #if defined(_WIN32)
 std::string last_error_message()
 {
@@ -459,13 +472,13 @@ std::filesystem::path default_managed_directory()
     const auto exe_dir = executable_path().parent_path();
     candidates.push_back(exe_dir / "managed");
 
-    try
+    std::filesystem::path module;
+    if (try_module_path(module))
     {
-        const auto module_dir = module_path().parent_path();
+        const auto module_dir = module.parent_path();
         candidates.push_back(module_dir / "managed");
         candidates.push_back(module_dir / "openms_thermo_bridge" / "managed");
     }
-    catch (...) {}
 
     for (const auto& candidate : candidates)
     {
