@@ -107,6 +107,13 @@ target_link_libraries(my_tool PRIVATE OpenMSThermoBridge::openms_thermo_bridge)
 openms_thermo_bridge_copy_runtime_files(TARGET my_tool)
 ```
 
+`openms_thermo_bridge_copy_runtime_files()` stages everything needed beside the given target's output directory:
+- `managed/ThermoWrapperManaged.dll`
+- `managed/ThermoWrapperManaged.runtimeconfig.json`
+- the dynamic `nethost` runtime library on platforms where it is needed
+
+For executables, call it on the final executable target. If your code uses OpenMSThermoBridge from a shared library/plugin, call it on that shared library target instead so the runtime payload lives next to the library that actually ships to users.
+
 ### Installed package / `find_package(... CONFIG)`
 ```cmake
 find_package(OpenMSThermoBridge CONFIG REQUIRED)
@@ -115,6 +122,12 @@ add_executable(my_tool main.cpp)
 target_link_libraries(my_tool PRIVATE OpenMSThermoBridge::openms_thermo_bridge)
 openms_thermo_bridge_copy_runtime_files(TARGET my_tool)
 ```
+
+At runtime the bridge first looks for `managed/` next to the executable, then next to the loaded `openms_thermo_bridge` binary, and also supports the installed package layout under `openms_thermo_bridge/managed`. That means:
+- build-tree consumers can stage runtime files next to their executable or shared library with `openms_thermo_bridge_copy_runtime_files()`
+- installed-package consumers can either stage the runtime files the same way or rely on the package's installed `lib/openms_thermo_bridge/managed` layout
+
+If you bypass the helper and pass an explicit managed directory to `openms::thermo_bridge::RawFile` or `get_scan_count(...)`, then you are responsible for shipping that directory yourself.
 
 ## Requirements
 - CMake 3.21+

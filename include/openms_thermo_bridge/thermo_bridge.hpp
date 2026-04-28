@@ -40,7 +40,7 @@ struct ChromatogramData
 //  Legacy (convenience) free-functions
 // ----------------------------------------------------------------
 
-/// Returns the managed runtime directory next to the current executable.
+/// Returns the managed runtime directory resolved from the executable/library layout.
 std::filesystem::path default_managed_directory();
 
 /// Open, read scan count, close.  Throws bridge_error on failure.
