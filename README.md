@@ -119,7 +119,7 @@ openms_thermo_bridge_copy_runtime_files(TARGET my_tool)
 ## Requirements
 - CMake 3.21+
 - .NET 8 SDK when CMake builds `ThermoWrapperManaged.csproj` locally with `dotnet publish`
-- Platform-specific `.NET` `nethost` headers and library to build the native bridge; these usually come from the .NET SDK/host pack even when using pre-built managed artifacts
+- Platform-specific .NET `nethost` headers and library to build the native bridge; these usually come from the .NET SDK/host pack even when using pre-built managed artifacts
 - .NET 8 runtime for the final executable at runtime
 - A C++17 compiler
 - Network access to `api.nuget.org` and, when the relevant options are enabled, `raw.githubusercontent.com`
