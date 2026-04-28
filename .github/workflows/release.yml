@@ -50,34 +50,30 @@ jobs:
           echo "DOTNET_ROOT_X64=${HOME}/.dotnet-x64" >> "${GITHUB_ENV}"
           echo "DOTNET_MULTILEVEL_LOOKUP=0" >> "${GITHUB_ENV}"
 
-      - name: Publish managed bridge (Linux / Windows)
+      - name: Configure (Linux / Windows)
         if: runner.os != 'macOS'
         shell: bash
         run: |
-          dotnet publish ThermoWrapperManaged.csproj \
-            -c Release \
-            --nologo \
-            --self-contained false \
-            -o "${{ github.workspace }}/managed-output"
+          cmake -S "${{ github.workspace }}" -B "${{ github.workspace }}/build" \
+            -DOPENMS_THERMO_BRIDGE_ENABLE_VENDOR_DOWNLOAD=ON
 
-      - name: Publish managed bridge (macOS x64 workaround)
+      - name: Configure (macOS x64 workaround)
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          dotnet publish ThermoWrapperManaged.csproj \
-            -c Release \
-            --nologo \
-            --self-contained false \
-            -r osx-x64 \
-            --os osx \
-            -a x64 \
-            -o "${{ github.workspace }}/managed-output"
+          cmake -S "${{ github.workspace }}" -B "${{ github.workspace }}/build" \
+            -DOPENMS_THERMO_BRIDGE_ENABLE_VENDOR_DOWNLOAD=ON \
+            -DDOTNET_EXECUTABLE="${HOME}/.dotnet-x64/dotnet"
+
+      - name: Build managed bridge
+        shell: bash
+        run: cmake --build "${{ github.workspace }}/build" --config Release --target openms_thermo_bridge_managed
 
       - name: Zip managed output (Linux / macOS)
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          cd "${{ github.workspace }}/managed-output"
+          cd "${{ github.workspace }}/build/openms_thermo_bridge_managed"
           zip -r "${{ github.workspace }}/openms-thermo-bridge-managed-${{ matrix.platform }}-${{ github.ref_name }}.zip" .
 
       - name: Zip managed output (Windows)
@@ -85,7 +81,7 @@ jobs:
         shell: pwsh
         run: |
           Compress-Archive `
-            -Path "${{ github.workspace }}\managed-output\*" `
+            -Path "${{ github.workspace }}\build\openms_thermo_bridge_managed\*" `
             -DestinationPath "${{ github.workspace }}\openms-thermo-bridge-managed-${{ matrix.platform }}-${{ github.ref_name }}.zip"
 
       - name: Upload artifact
