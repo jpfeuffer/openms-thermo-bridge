@@ -15,6 +15,10 @@ set(OPENMS_THERMO_BRIDGE_THERMO_COMMIT "db08ff32cbb626d259b6d4d98492c83d6f2f6871
 set(OPENMS_THERMO_BRIDGE_THERMO_VERSION "8.0.6" CACHE STRING "Thermo RawFileReader package version.")
 set(OPENMS_THERMO_BRIDGE_SAMPLE_RAW_URL "https://raw.githubusercontent.com/HegemanLab/small-thermo-raw-file-examples/cfac6a25b44913273dd458d5f5db9b20b0c1107d/ginkgotoxin-ms-positive.raw" CACHE STRING "Public sample RAW file used by the test suite.")
 option(OPENMS_THERMO_BRIDGE_DOWNLOAD_TEST_DATA "Download public sample RAW data when BUILD_TESTING is enabled." ON)
+set(OPENMS_THERMO_BRIDGE_PREBUILT_MANAGED_DIR "" CACHE PATH
+  "Path to a pre-built managed output directory (e.g. unpacked release artifact). When set, dotnet publish is skipped.")
+option(OPENMS_THERMO_BRIDGE_DOWNLOAD_PREBUILT_MANAGED
+  "Automatically download the pre-built managed artifact for the current platform from GitHub Releases." OFF)
 set(_openms_thermo_bridge_osx_arm64_workaround_default OFF)
 if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
   set(_openms_thermo_bridge_osx_arm64_workaround_default ON)
@@ -45,68 +49,178 @@ if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
   endif()
 endif()
 
-find_program(DOTNET_EXECUTABLE NAMES dotnet REQUIRED)
 find_package(DotNetHost REQUIRED)
 
 set(OPENMS_THERMO_BRIDGE_MANAGED_DIR "${CMAKE_CURRENT_BINARY_DIR}/openms_thermo_bridge_managed")
 set(OPENMS_THERMO_BRIDGE_TEST_DATA_DIR "${CMAKE_CURRENT_BINARY_DIR}/testdata")
 set(OPENMS_THERMO_BRIDGE_NUGET_CONFIG "${CMAKE_CURRENT_BINARY_DIR}/OpenMSThermoBridge.NuGet.config")
-set(OPENMS_THERMO_BRIDGE_MANAGED_WARNING_COMMAND)
-if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$" AND OPENMS_THERMO_BRIDGE_OSX_ARM64_X64_WORKAROUND)
-  set(OPENMS_THERMO_BRIDGE_MANAGED_WARNING_COMMAND
-    COMMAND "${CMAKE_COMMAND}" -E cmake_echo_color --yellow
-            "Building osx-x64 managed artifacts for Rosetta compatibility on Apple Silicon; performance may be reduced under emulation.")
-endif()
-set(OPENMS_THERMO_BRIDGE_MANAGED_FILES
-    "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}/ThermoWrapperManaged.dll"
-    "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}/ThermoWrapperManaged.runtimeconfig.json")
-set(OpenMSThermoBridge_MANAGED_DIR "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}" CACHE INTERNAL "Managed runtime directory for OpenMSThermoBridge.")
-
-file(TO_CMAKE_PATH "${OPENMS_THERMO_BRIDGE_VENDOR_DIR}" OPENMS_THERMO_BRIDGE_VENDOR_DIR_CMAKE_PATH)
-file(CONFIGURE
-  OUTPUT "${OPENMS_THERMO_BRIDGE_NUGET_CONFIG}"
-  CONTENT "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<configuration>\n  <packageSources>\n    <clear />\n    <add key=\"openms-thermo-bridge-vendor\" value=\"@OPENMS_THERMO_BRIDGE_VENDOR_DIR_CMAKE_PATH@\" />\n    <add key=\"nuget.org\" value=\"https://api.nuget.org/v3/index.json\" />\n  </packageSources>\n</configuration>\n"
-  @ONLY)
 
 include(OpenMSThermoBridgeFunctions)
 
-openms_thermo_bridge_vendor_package_names(OPENMS_THERMO_BRIDGE_VENDOR_PACKAGE_NAMES)
-set(OPENMS_THERMO_BRIDGE_VENDOR_PACKAGE_FILES)
-foreach(package_name IN LISTS OPENMS_THERMO_BRIDGE_VENDOR_PACKAGE_NAMES)
-  list(APPEND OPENMS_THERMO_BRIDGE_VENDOR_PACKAGE_FILES "${OPENMS_THERMO_BRIDGE_VENDOR_DIR}/${package_name}")
-endforeach()
+# ---------------------------------------------------------------------------
+# Determine the platform identifier used for release artifact zip file names.
+# ---------------------------------------------------------------------------
+if(WIN32)
+  set(_openms_thermo_bridge_platform "win-x64")
+elseif(APPLE)
+  # Always use osx-x64 artifacts (Rosetta workaround applies on Apple Silicon).
+  set(_openms_thermo_bridge_platform "osx-x64")
+else()
+  set(_openms_thermo_bridge_platform "linux-x64")
+endif()
 
-add_custom_target(openms_thermo_bridge_vendor_packages
-  COMMAND "${CMAKE_COMMAND}"
-          -DOPENMS_THERMO_BRIDGE_ENABLE_VENDOR_DOWNLOAD=${OPENMS_THERMO_BRIDGE_ENABLE_VENDOR_DOWNLOAD}
-          -DOPENMS_THERMO_BRIDGE_VENDOR_DIR=${OPENMS_THERMO_BRIDGE_VENDOR_DIR}
-          -DOPENMS_THERMO_BRIDGE_THERMO_COMMIT=${OPENMS_THERMO_BRIDGE_THERMO_COMMIT}
-          -DOPENMS_THERMO_BRIDGE_THERMO_VERSION=${OPENMS_THERMO_BRIDGE_THERMO_VERSION}
-          -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/DownloadThermoPackages.cmake"
-  BYPRODUCTS ${OPENMS_THERMO_BRIDGE_VENDOR_PACKAGE_FILES}
-  COMMENT "Preparing Thermo vendor packages"
-  VERBATIM)
+# ---------------------------------------------------------------------------
+# Auto-download pre-built managed artifacts when requested.
+# ---------------------------------------------------------------------------
+if(OPENMS_THERMO_BRIDGE_DOWNLOAD_PREBUILT_MANAGED AND NOT OPENMS_THERMO_BRIDGE_PREBUILT_MANAGED_DIR)
+  set(_openms_thermo_bridge_version "${PROJECT_VERSION}")
+  set(_openms_thermo_bridge_zip_name
+    "openms-thermo-bridge-managed-${_openms_thermo_bridge_platform}-${_openms_thermo_bridge_version}.zip")
+  set(_openms_thermo_bridge_zip_url
+    "https://github.com/jpfeuffer/openms-thermo-bridge/releases/download/v${_openms_thermo_bridge_version}/${_openms_thermo_bridge_zip_name}")
+  set(_openms_thermo_bridge_zip_dest
+    "${CMAKE_CURRENT_BINARY_DIR}/prebuilt-managed/${_openms_thermo_bridge_zip_name}")
+  set(_openms_thermo_bridge_extract_dir
+    "${CMAKE_CURRENT_BINARY_DIR}/prebuilt-managed/extracted")
 
-add_custom_command(
-  OUTPUT ${OPENMS_THERMO_BRIDGE_MANAGED_FILES}
-  COMMAND "${CMAKE_COMMAND}" -E make_directory "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}"
-  ${OPENMS_THERMO_BRIDGE_MANAGED_WARNING_COMMAND}
-  COMMAND "${DOTNET_EXECUTABLE}" publish "${CMAKE_CURRENT_SOURCE_DIR}/ThermoWrapperManaged.csproj"
-          -c Release
-          --nologo
-          --self-contained false
-          ${OPENMS_THERMO_BRIDGE_DOTNET_PUBLISH_ARGS}
-          -o "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}"
-          --configfile "${OPENMS_THERMO_BRIDGE_NUGET_CONFIG}"
-  DEPENDS openms_thermo_bridge_vendor_packages
-          "${CMAKE_CURRENT_SOURCE_DIR}/ThermoWrapperManaged.csproj"
-          "${CMAKE_CURRENT_SOURCE_DIR}/ThermoWrapperManaged.cs"
-          "${OPENMS_THERMO_BRIDGE_NUGET_CONFIG}"
-  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-  COMMENT "Publishing managed Thermo bridge"
-  VERBATIM)
+  if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
+    message(STATUS
+      "OpenMS Thermo Bridge: downloading pre-built osx-x64 managed artifact for use through Rosetta on Apple Silicon.")
+  else()
+    message(STATUS
+      "OpenMS Thermo Bridge: downloading pre-built ${_openms_thermo_bridge_platform} managed artifact from GitHub Releases.")
+  endif()
 
-add_custom_target(openms_thermo_bridge_managed ALL DEPENDS ${OPENMS_THERMO_BRIDGE_MANAGED_FILES})
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/prebuilt-managed")
+  if(NOT EXISTS "${_openms_thermo_bridge_zip_dest}")
+    file(DOWNLOAD
+      "${_openms_thermo_bridge_zip_url}"
+      "${_openms_thermo_bridge_zip_dest}"
+      STATUS _openms_thermo_bridge_dl_status
+      TLS_VERIFY ON)
+    list(GET _openms_thermo_bridge_dl_status 0 _openms_thermo_bridge_dl_code)
+    list(GET _openms_thermo_bridge_dl_status 1 _openms_thermo_bridge_dl_msg)
+    if(NOT _openms_thermo_bridge_dl_code EQUAL 0)
+      message(FATAL_ERROR
+        "OpenMS Thermo Bridge: failed to download pre-built managed artifact from '${_openms_thermo_bridge_zip_url}': "
+        "${_openms_thermo_bridge_dl_msg}. "
+        "Either provide the artifact manually via OPENMS_THERMO_BRIDGE_PREBUILT_MANAGED_DIR or ensure a .NET 8 SDK is "
+        "available so the managed bridge can be built from source.")
+    endif()
+  endif()
+
+  file(MAKE_DIRECTORY "${_openms_thermo_bridge_extract_dir}")
+  execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E tar xf "${_openms_thermo_bridge_zip_dest}"
+    WORKING_DIRECTORY "${_openms_thermo_bridge_extract_dir}"
+    RESULT_VARIABLE _openms_thermo_bridge_extract_result)
+  if(NOT _openms_thermo_bridge_extract_result EQUAL 0)
+    message(FATAL_ERROR
+      "OpenMS Thermo Bridge: failed to extract '${_openms_thermo_bridge_zip_dest}'.")
+  endif()
+
+  # Store the resolved directory in a local variable; do not force-overwrite the
+  # user-visible cache entry to avoid silently discarding manual overrides on
+  # subsequent reconfigures.
+  set(_openms_thermo_bridge_resolved_prebuilt_dir "${_openms_thermo_bridge_extract_dir}")
+endif()
+
+if(_openms_thermo_bridge_resolved_prebuilt_dir OR OPENMS_THERMO_BRIDGE_PREBUILT_MANAGED_DIR)
+  if(_openms_thermo_bridge_resolved_prebuilt_dir)
+    set(_openms_thermo_bridge_prebuilt_path "${_openms_thermo_bridge_resolved_prebuilt_dir}")
+  else()
+    set(_openms_thermo_bridge_prebuilt_path "${OPENMS_THERMO_BRIDGE_PREBUILT_MANAGED_DIR}")
+  endif()
+
+  # ---------------------------------------------------------------------------
+  # Use a pre-built managed directory (skip dotnet publish).
+  # ---------------------------------------------------------------------------
+  foreach(_required_file
+      "ThermoWrapperManaged.dll"
+      "ThermoWrapperManaged.runtimeconfig.json")
+    if(NOT EXISTS "${_openms_thermo_bridge_prebuilt_path}/${_required_file}")
+      message(FATAL_ERROR
+        "OpenMS Thermo Bridge: pre-built managed directory '${_openms_thermo_bridge_prebuilt_path}' "
+        "does not contain the required file '${_required_file}'.")
+    endif()
+  endforeach()
+
+  if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$" AND OPENMS_THERMO_BRIDGE_OSX_ARM64_X64_WORKAROUND)
+    message(STATUS
+      "OpenMS Thermo Bridge: using pre-built osx-x64 managed artifacts from "
+      "'${_openms_thermo_bridge_prebuilt_path}' through Rosetta on Apple Silicon; "
+      "performance may be reduced under emulation.")
+  else()
+    message(STATUS
+      "OpenMS Thermo Bridge: using pre-built managed artifacts from '${_openms_thermo_bridge_prebuilt_path}'.")
+  endif()
+
+  set(OPENMS_THERMO_BRIDGE_MANAGED_DIR "${_openms_thermo_bridge_prebuilt_path}")
+  set(OpenMSThermoBridge_MANAGED_DIR "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}" CACHE INTERNAL "Managed runtime directory for OpenMSThermoBridge.")
+
+  # Create a no-op target so the rest of the build graph is unchanged.
+  add_custom_target(openms_thermo_bridge_managed ALL)
+else()
+  # ---------------------------------------------------------------------------
+  # Build the managed bridge from source using dotnet publish.
+  # ---------------------------------------------------------------------------
+  find_program(DOTNET_EXECUTABLE NAMES dotnet REQUIRED)
+
+  set(OPENMS_THERMO_BRIDGE_MANAGED_WARNING_COMMAND)
+  if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$" AND OPENMS_THERMO_BRIDGE_OSX_ARM64_X64_WORKAROUND)
+    set(OPENMS_THERMO_BRIDGE_MANAGED_WARNING_COMMAND
+      COMMAND "${CMAKE_COMMAND}" -E cmake_echo_color --yellow
+              "Building osx-x64 managed artifacts for Rosetta compatibility on Apple Silicon; performance may be reduced under emulation.")
+  endif()
+  set(OPENMS_THERMO_BRIDGE_MANAGED_FILES
+      "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}/ThermoWrapperManaged.dll"
+      "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}/ThermoWrapperManaged.runtimeconfig.json")
+  set(OpenMSThermoBridge_MANAGED_DIR "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}" CACHE INTERNAL "Managed runtime directory for OpenMSThermoBridge.")
+
+  file(TO_CMAKE_PATH "${OPENMS_THERMO_BRIDGE_VENDOR_DIR}" OPENMS_THERMO_BRIDGE_VENDOR_DIR_CMAKE_PATH)
+  file(CONFIGURE
+    OUTPUT "${OPENMS_THERMO_BRIDGE_NUGET_CONFIG}"
+    CONTENT "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<configuration>\n  <packageSources>\n    <clear />\n    <add key=\"openms-thermo-bridge-vendor\" value=\"@OPENMS_THERMO_BRIDGE_VENDOR_DIR_CMAKE_PATH@\" />\n    <add key=\"nuget.org\" value=\"https://api.nuget.org/v3/index.json\" />\n  </packageSources>\n</configuration>\n"
+    @ONLY)
+
+  openms_thermo_bridge_vendor_package_names(OPENMS_THERMO_BRIDGE_VENDOR_PACKAGE_NAMES)
+  set(OPENMS_THERMO_BRIDGE_VENDOR_PACKAGE_FILES)
+  foreach(package_name IN LISTS OPENMS_THERMO_BRIDGE_VENDOR_PACKAGE_NAMES)
+    list(APPEND OPENMS_THERMO_BRIDGE_VENDOR_PACKAGE_FILES "${OPENMS_THERMO_BRIDGE_VENDOR_DIR}/${package_name}")
+  endforeach()
+
+  add_custom_target(openms_thermo_bridge_vendor_packages
+    COMMAND "${CMAKE_COMMAND}"
+            -DOPENMS_THERMO_BRIDGE_ENABLE_VENDOR_DOWNLOAD=${OPENMS_THERMO_BRIDGE_ENABLE_VENDOR_DOWNLOAD}
+            -DOPENMS_THERMO_BRIDGE_VENDOR_DIR=${OPENMS_THERMO_BRIDGE_VENDOR_DIR}
+            -DOPENMS_THERMO_BRIDGE_THERMO_COMMIT=${OPENMS_THERMO_BRIDGE_THERMO_COMMIT}
+            -DOPENMS_THERMO_BRIDGE_THERMO_VERSION=${OPENMS_THERMO_BRIDGE_THERMO_VERSION}
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/DownloadThermoPackages.cmake"
+    BYPRODUCTS ${OPENMS_THERMO_BRIDGE_VENDOR_PACKAGE_FILES}
+    COMMENT "Preparing Thermo vendor packages"
+    VERBATIM)
+
+  add_custom_command(
+    OUTPUT ${OPENMS_THERMO_BRIDGE_MANAGED_FILES}
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}"
+    ${OPENMS_THERMO_BRIDGE_MANAGED_WARNING_COMMAND}
+    COMMAND "${DOTNET_EXECUTABLE}" publish "${CMAKE_CURRENT_SOURCE_DIR}/ThermoWrapperManaged.csproj"
+            -c Release
+            --nologo
+            --self-contained false
+            ${OPENMS_THERMO_BRIDGE_DOTNET_PUBLISH_ARGS}
+            -o "${OPENMS_THERMO_BRIDGE_MANAGED_DIR}"
+            --configfile "${OPENMS_THERMO_BRIDGE_NUGET_CONFIG}"
+    DEPENDS openms_thermo_bridge_vendor_packages
+            "${CMAKE_CURRENT_SOURCE_DIR}/ThermoWrapperManaged.csproj"
+            "${CMAKE_CURRENT_SOURCE_DIR}/ThermoWrapperManaged.cs"
+            "${OPENMS_THERMO_BRIDGE_NUGET_CONFIG}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMENT "Publishing managed Thermo bridge"
+    VERBATIM)
+
+  add_custom_target(openms_thermo_bridge_managed ALL DEPENDS ${OPENMS_THERMO_BRIDGE_MANAGED_FILES})
+endif()
 
 add_library(openms_thermo_bridge src/thermo_bridge.cpp src/cv_mapping.cpp)
 add_library(OpenMSThermoBridge::openms_thermo_bridge ALIAS openms_thermo_bridge)

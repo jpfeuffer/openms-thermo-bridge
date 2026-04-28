@@ -1,0 +1,143 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  THERMO_COMMIT: db08ff32cbb626d259b6d4d98492c83d6f2f6871
+  THERMO_VERSION: 8.0.6
+
+jobs:
+  build-managed:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+          - os: windows-latest
+            platform: win-x64
+          - os: macos-latest
+            platform: osx-x64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8 SDK
+        if: runner.os != 'macOS'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install .NET 8 SDK (macOS x64 workaround)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          curl -fsSL https://dot.net/v1/dotnet-install.sh -o "${RUNNER_TEMP}/dotnet-install.sh"
+          chmod +x "${RUNNER_TEMP}/dotnet-install.sh"
+          "${RUNNER_TEMP}/dotnet-install.sh" --channel 8.0 --architecture x64 --install-dir "${HOME}/.dotnet-x64"
+          "${HOME}/.dotnet-x64/dotnet" --info
+
+      - name: Configure .NET environment for macOS x64 workaround
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "${HOME}/.dotnet-x64" >> "${GITHUB_PATH}"
+          echo "DOTNET_ROOT=${HOME}/.dotnet-x64" >> "${GITHUB_ENV}"
+          echo "DOTNET_ROOT_X64=${HOME}/.dotnet-x64" >> "${GITHUB_ENV}"
+          echo "DOTNET_MULTILEVEL_LOOKUP=0" >> "${GITHUB_ENV}"
+
+      - name: Download Thermo vendor packages
+        shell: bash
+        run: |
+          base_url="https://raw.githubusercontent.com/thermofisherlsms/RawFileReader/${THERMO_COMMIT}/Libs/NetCore/Net8"
+          mkdir -p vendor/thermo-feed
+          for pkg in \
+            "ThermoFisher.CommonCore.BackgroundSubtraction.${THERMO_VERSION}.nupkg" \
+            "ThermoFisher.CommonCore.Data.${THERMO_VERSION}.nupkg" \
+            "ThermoFisher.CommonCore.MassPrecisionEstimator.${THERMO_VERSION}.nupkg" \
+            "ThermoFisher.CommonCore.RandomAccessReaderPlugin.${THERMO_VERSION}.nupkg" \
+            "ThermoFisher.CommonCore.RawfileReader.${THERMO_VERSION}.nupkg"; do
+            curl -fsSL "${base_url}/${pkg}" -o "vendor/thermo-feed/${pkg}"
+          done
+
+      - name: Write NuGet config for vendor feed
+        shell: bash
+        run: |
+          vendor_abs="$(cd vendor/thermo-feed && pwd)"
+          cat > vendor-nuget.config <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="openms-thermo-bridge-vendor" value="${vendor_abs}" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+          </configuration>
+          EOF
+
+      - name: Publish managed bridge (non-macOS)
+        if: runner.os != 'macOS'
+        shell: bash
+        run: |
+          dotnet publish ThermoWrapperManaged.csproj \
+            -c Release \
+            --nologo \
+            --self-contained false \
+            --configfile vendor-nuget.config \
+            -o managed-output
+
+      - name: Publish managed bridge (macOS osx-x64)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          dotnet publish ThermoWrapperManaged.csproj \
+            -c Release \
+            --nologo \
+            --self-contained false \
+            --configfile vendor-nuget.config \
+            --os osx \
+            -a x64 \
+            -o managed-output
+
+      - name: Determine version from tag
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create zip archive
+        shell: bash
+        run: |
+          cd managed-output
+          cmake -E tar cf \
+            "../openms-thermo-bridge-managed-${{ matrix.platform }}-${{ steps.version.outputs.version }}.zip" \
+            --format=zip \
+            .
+
+      - name: Upload artifact for release job
+        uses: actions/upload-artifact@v4
+        with:
+          name: managed-${{ matrix.platform }}
+          path: openms-thermo-bridge-managed-${{ matrix.platform }}-${{ steps.version.outputs.version }}.zip
+
+  publish-release:
+    needs: build-managed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.zip

@@ -45,6 +45,32 @@ cmake --build build --parallel
 
 For Linux convenience, `build_linux.sh` configures, builds, and runs the tests with the vendor-download option enabled.
 
+### Option 3: use pre-built managed DLLs
+
+GitHub Releases for this project include pre-built managed artifact zips (one per platform: `linux-x64`, `win-x64`, `osx-x64`). Using them means you do **not** need a .NET 8 SDK at build time — only the .NET 8 runtime is needed at runtime.
+
+#### 3a: manually download and unpack
+
+Download the zip matching your platform from the [Releases page](https://github.com/jpfeuffer/openms-thermo-bridge/releases), unpack it, and point CMake at the directory:
+
+```bash
+cmake -S . -B build \
+  -DOPENMS_THERMO_BRIDGE_PREBUILT_MANAGED_DIR=/path/to/unpacked/zip
+cmake --build build --parallel
+```
+
+#### 3b: let CMake download automatically
+
+```bash
+cmake -S . -B build \
+  -DOPENMS_THERMO_BRIDGE_DOWNLOAD_PREBUILT_MANAGED=ON
+cmake --build build --parallel
+```
+
+CMake will fetch the correct platform zip from GitHub Releases, extract it into the build directory, and use it automatically.
+
+> **Apple Silicon note:** pre-built artifacts are always `osx-x64` and run via Rosetta, consistent with the existing workaround. The same Rosetta performance caveat applies.
+
 ## Test
 ```bash
 ctest --test-dir build --output-on-failure
@@ -91,9 +117,9 @@ openms_thermo_bridge_copy_runtime_files(TARGET my_tool)
 
 ## Requirements
 - CMake 3.21+
-- .NET 8 SDK with the platform-specific `nethost` pack installed
+- .NET 8 SDK with the platform-specific `nethost` pack installed *(not required when using pre-built artifacts; only the .NET 8 runtime is needed at runtime)*
 - A C++17 compiler
-- Network access to `api.nuget.org` and, when the relevant options are enabled, `raw.githubusercontent.com`
+- Network access to `api.nuget.org` and, when the relevant options are enabled, `raw.githubusercontent.com` or `github.com`
 - On Apple Silicon macOS, an `osx-x64` .NET 8 installation usable through Rosetta when the workaround is enabled
 
 ## Status
