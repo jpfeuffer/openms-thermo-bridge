@@ -43,6 +43,33 @@ cmake -S . -B build \
 cmake --build build --parallel
 ```
 
+### Option 3: use pre-built managed DLLs
+
+Pre-built managed artifacts for each platform are published as GitHub Release assets, so CMake does not need to run `dotnet publish` for `ThermoWrapperManaged.csproj`.
+The final executable still needs the .NET 8 **runtime** at runtime, and the native bridge build still needs the platform-specific `nethost` headers and library. In practice those `nethost` development files usually come from the .NET SDK/host pack rather than a runtime-only install.
+
+#### Manually download and unpack
+
+Download the zip for your platform from the [GitHub Releases page](https://github.com/jpfeuffer/openms-thermo-bridge/releases), unpack it, and point CMake at the extracted directory:
+
+```bash
+cmake -S . -B build \
+  -DOPENMS_THERMO_BRIDGE_PREBUILT_MANAGED_DIR=/path/to/unpacked/zip
+cmake --build build --parallel
+```
+
+#### Automatic download during CMake configure
+
+CMake will fetch and extract the correct platform zip from GitHub Releases automatically:
+
+```bash
+cmake -S . -B build \
+  -DOPENMS_THERMO_BRIDGE_DOWNLOAD_PREBUILT_MANAGED=ON
+cmake --build build --parallel
+```
+
+> **Note:** On Apple Silicon, pre-built artifacts are always `osx-x64` and run via Rosetta, consistent with the existing `OPENMS_THERMO_BRIDGE_OSX_ARM64_X64_WORKAROUND` behaviour. You still need an `osx-x64` .NET installation that provides the matching `nethost` files.
+
 For Linux convenience, `build_linux.sh` configures, builds, and runs the tests with the vendor-download option enabled.
 
 ## Test
@@ -80,6 +107,13 @@ target_link_libraries(my_tool PRIVATE OpenMSThermoBridge::openms_thermo_bridge)
 openms_thermo_bridge_copy_runtime_files(TARGET my_tool)
 ```
 
+`openms_thermo_bridge_copy_runtime_files()` stages everything needed beside the given target's output directory:
+- `managed/ThermoWrapperManaged.dll`
+- `managed/ThermoWrapperManaged.runtimeconfig.json`
+- the dynamic `nethost` runtime library on platforms where it is needed
+
+For executables, call it on the final executable target. If your code uses OpenMSThermoBridge from a shared library/plugin, call it on that shared library target instead so the runtime payload lives next to the library that actually ships to users.
+
 ### Installed package / `find_package(... CONFIG)`
 ```cmake
 find_package(OpenMSThermoBridge CONFIG REQUIRED)
@@ -89,12 +123,21 @@ target_link_libraries(my_tool PRIVATE OpenMSThermoBridge::openms_thermo_bridge)
 openms_thermo_bridge_copy_runtime_files(TARGET my_tool)
 ```
 
+At runtime the bridge first looks for `managed/` next to the executable, then next to the loaded `openms_thermo_bridge` binary, and also supports the installed package layout under `openms_thermo_bridge/managed`. That means:
+- build-tree consumers can stage runtime files next to their executable or shared library with `openms_thermo_bridge_copy_runtime_files()`
+- installed-package consumers can either stage the runtime files the same way or rely on the package's installed `lib/openms_thermo_bridge/managed` layout
+
+If you bypass the helper and pass an explicit managed directory to `openms::thermo_bridge::RawFile` or `get_scan_count(...)`, then you are responsible for shipping that directory yourself.
+
 ## Requirements
 - CMake 3.21+
-- .NET 8 SDK with the platform-specific `nethost` pack installed
+- .NET 8 SDK when CMake builds `ThermoWrapperManaged.csproj` locally with `dotnet publish`
+- Platform-specific .NET `nethost` headers and library to build the native bridge; these usually come from the .NET SDK/host pack even when using pre-built managed artifacts
+- .NET 8 runtime for the final executable at runtime
 - A C++17 compiler
 - Network access to `api.nuget.org` and, when the relevant options are enabled, `raw.githubusercontent.com`
 - On Apple Silicon macOS, an `osx-x64` .NET 8 installation usable through Rosetta when the workaround is enabled
+- Pre-built artifact downloads (`OPENMS_THERMO_BRIDGE_DOWNLOAD_PREBUILT_MANAGED=ON`) additionally require network access to `github.com`
 
 ## Status
 - [x] Linux, macOS, and Windows CMake builds

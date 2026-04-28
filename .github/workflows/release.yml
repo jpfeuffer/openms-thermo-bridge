@@ -1,0 +1,110 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-managed:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+          - os: windows-latest
+            platform: win-x64
+          - os: macos-latest
+            platform: osx-x64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8 SDK
+        if: runner.os != 'macOS'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install .NET 8 SDK (macOS x64 workaround)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          curl -fsSL https://dot.net/v1/dotnet-install.sh -o "${RUNNER_TEMP}/dotnet-install.sh"
+          chmod +x "${RUNNER_TEMP}/dotnet-install.sh"
+          "${RUNNER_TEMP}/dotnet-install.sh" --channel 8.0 --architecture x64 --install-dir "${HOME}/.dotnet-x64"
+          "${HOME}/.dotnet-x64/dotnet" --info
+
+      - name: Configure .NET environment for macOS x64 workaround
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "${HOME}/.dotnet-x64" >> "${GITHUB_PATH}"
+          echo "DOTNET_ROOT=${HOME}/.dotnet-x64" >> "${GITHUB_ENV}"
+          echo "DOTNET_ROOT_X64=${HOME}/.dotnet-x64" >> "${GITHUB_ENV}"
+          echo "DOTNET_MULTILEVEL_LOOKUP=0" >> "${GITHUB_ENV}"
+
+      - name: Publish managed bridge (Linux / Windows)
+        if: runner.os != 'macOS'
+        shell: bash
+        run: |
+          dotnet publish ThermoWrapperManaged.csproj \
+            -c Release \
+            --nologo \
+            --self-contained false \
+            -o "${{ github.workspace }}/managed-output"
+
+      - name: Publish managed bridge (macOS x64 workaround)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          dotnet publish ThermoWrapperManaged.csproj \
+            -c Release \
+            --nologo \
+            --self-contained false \
+            -r osx-x64 \
+            --os osx \
+            -a x64 \
+            -o "${{ github.workspace }}/managed-output"
+
+      - name: Zip managed output (Linux / macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cd "${{ github.workspace }}/managed-output"
+          zip -r "${{ github.workspace }}/openms-thermo-bridge-managed-${{ matrix.platform }}-${{ github.ref_name }}.zip" .
+
+      - name: Zip managed output (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "${{ github.workspace }}\managed-output\*" `
+            -DestinationPath "${{ github.workspace }}\openms-thermo-bridge-managed-${{ matrix.platform }}-${{ github.ref_name }}.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: managed-${{ matrix.platform }}
+          path: openms-thermo-bridge-managed-${{ matrix.platform }}-${{ github.ref_name }}.zip
+
+  publish-release:
+    needs: build-managed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4.1.8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.zip

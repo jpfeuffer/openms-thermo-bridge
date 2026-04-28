@@ -73,6 +73,10 @@ namespace
 //  Platform helpers (unchanged from original)
 // ================================================================
 
+void module_path_anchor()
+{
+}
+
 #if defined(_WIN32)
 using library_handle = HMODULE;
 #else
@@ -110,6 +114,47 @@ std::filesystem::path executable_path()
 #else
     throw bridge_error("Executable path resolution is not implemented on this platform");
 #endif
+}
+
+std::filesystem::path module_path()
+{
+#if defined(_WIN32)
+    HMODULE module = nullptr;
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                            reinterpret_cast<LPCWSTR>(&module_path_anchor), &module)
+        || module == nullptr)
+    {
+        throw bridge_error("Unable to resolve module path");
+    }
+
+    std::vector<wchar_t> buffer(MAX_PATH);
+    while (true)
+    {
+        const DWORD length = GetModuleFileNameW(module, buffer.data(), static_cast<DWORD>(buffer.size()));
+        if (length == 0) throw bridge_error("Unable to resolve module path");
+        if (length < buffer.size() - 1)
+            return std::filesystem::path(buffer.data(), buffer.data() + length);
+        buffer.resize(buffer.size() * 2);
+    }
+#else
+    Dl_info info{};
+    if (dladdr(reinterpret_cast<void*>(&module_path_anchor), &info) == 0 || info.dli_fname == nullptr || info.dli_fname[0] == '\0')
+        throw bridge_error("Unable to resolve module path");
+    return std::filesystem::weakly_canonical(std::filesystem::path(info.dli_fname));
+#endif
+}
+
+bool try_module_path(std::filesystem::path& result)
+{
+    try
+    {
+        result = module_path();
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
 }
 
 #if defined(_WIN32)
@@ -423,7 +468,28 @@ std::string call_string_fn(FnType fn, int handle, ExtraArgs... extra)
 
 std::filesystem::path default_managed_directory()
 {
-    return executable_path().parent_path() / "managed";
+    std::vector<std::filesystem::path> candidates;
+    const auto exe_dir = executable_path().parent_path();
+    candidates.push_back(exe_dir / "managed");
+
+    std::filesystem::path module;
+    if (try_module_path(module))
+    {
+        const auto module_dir = module.parent_path();
+        candidates.push_back(module_dir / "managed");
+        candidates.push_back(module_dir / "openms_thermo_bridge" / "managed");
+    }
+
+    for (const auto& candidate : candidates)
+    {
+        if (std::filesystem::exists(candidate / "ThermoWrapperManaged.runtimeconfig.json")
+            && std::filesystem::exists(candidate / "ThermoWrapperManaged.dll"))
+        {
+            return candidate;
+        }
+    }
+
+    return candidates.front();
 }
 
 int get_scan_count(const std::filesystem::path& raw_file_path)
