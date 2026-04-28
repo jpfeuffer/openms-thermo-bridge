@@ -43,6 +43,32 @@ cmake -S . -B build \
 cmake --build build --parallel
 ```
 
+### Option 3: use pre-built managed DLLs (no .NET SDK required at build time)
+
+Pre-built managed artifacts for each platform are published as GitHub Release assets. You only need the .NET 8 **runtime** (not the SDK) on the target machine at runtime.
+
+#### Manually download and unpack
+
+Download the zip for your platform from the [GitHub Releases page](https://github.com/jpfeuffer/openms-thermo-bridge/releases), unpack it, and point CMake at the extracted directory:
+
+```bash
+cmake -S . -B build \
+  -DOPENMS_THERMO_BRIDGE_PREBUILT_MANAGED_DIR=/path/to/unpacked/zip
+cmake --build build --parallel
+```
+
+#### Automatic download during CMake configure
+
+CMake will fetch and extract the correct platform zip from GitHub Releases automatically:
+
+```bash
+cmake -S . -B build \
+  -DOPENMS_THERMO_BRIDGE_DOWNLOAD_PREBUILT_MANAGED=ON
+cmake --build build --parallel
+```
+
+> **Note:** On Apple Silicon, pre-built artifacts are always `osx-x64` and run via Rosetta, consistent with the existing `OPENMS_THERMO_BRIDGE_OSX_ARM64_X64_WORKAROUND` behaviour.
+
 For Linux convenience, `build_linux.sh` configures, builds, and runs the tests with the vendor-download option enabled.
 
 ## Test
@@ -91,10 +117,11 @@ openms_thermo_bridge_copy_runtime_files(TARGET my_tool)
 
 ## Requirements
 - CMake 3.21+
-- .NET 8 SDK with the platform-specific `nethost` pack installed
+- .NET 8 SDK with the platform-specific `nethost` pack installed (**not** required when using pre-built artifacts; only the .NET 8 runtime is needed at runtime)
 - A C++17 compiler
 - Network access to `api.nuget.org` and, when the relevant options are enabled, `raw.githubusercontent.com`
 - On Apple Silicon macOS, an `osx-x64` .NET 8 installation usable through Rosetta when the workaround is enabled
+- Pre-built artifact downloads (`OPENMS_THERMO_BRIDGE_DOWNLOAD_PREBUILT_MANAGED=ON`) additionally require network access to `github.com`
 
 ## Status
 - [x] Linux, macOS, and Windows CMake builds
