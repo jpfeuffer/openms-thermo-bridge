@@ -84,28 +84,34 @@ if(OPENMS_THERMO_BRIDGE_DOWNLOAD_PREBUILT_MANAGED AND NOT OPENMS_THERMO_BRIDGE_P
 
   message(STATUS "OpenMSThermoBridge: Downloading pre-built managed artifact from ${_openms_thermo_bridge_prebuilt_url}")
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/prebuilt-managed")
-  file(DOWNLOAD
-    "${_openms_thermo_bridge_prebuilt_url}"
-    "${_openms_thermo_bridge_prebuilt_zip}"
-    STATUS _openms_thermo_bridge_download_status
-    TLS_VERIFY ON)
-  list(GET _openms_thermo_bridge_download_status 0 _openms_thermo_bridge_download_code)
-  list(GET _openms_thermo_bridge_download_status 1 _openms_thermo_bridge_download_message)
-  if(NOT _openms_thermo_bridge_download_code EQUAL 0)
-    message(FATAL_ERROR
-      "OpenMSThermoBridge: Failed to download pre-built managed artifact: ${_openms_thermo_bridge_download_message}\n"
-      "URL: ${_openms_thermo_bridge_prebuilt_url}\n"
-      "Either provide -DOPENMS_THERMO_BRIDGE_PREBUILT_MANAGED_DIR=/path/to/extracted or ensure a .NET 8 SDK is "
-      "available so CMake can build the managed bridge itself.")
+  if(NOT EXISTS "${_openms_thermo_bridge_prebuilt_zip}")
+    file(DOWNLOAD
+      "${_openms_thermo_bridge_prebuilt_url}"
+      "${_openms_thermo_bridge_prebuilt_zip}"
+      STATUS _openms_thermo_bridge_download_status
+      TLS_VERIFY ON)
+    list(GET _openms_thermo_bridge_download_status 0 _openms_thermo_bridge_download_code)
+    list(GET _openms_thermo_bridge_download_status 1 _openms_thermo_bridge_download_message)
+    if(NOT _openms_thermo_bridge_download_code EQUAL 0)
+      message(FATAL_ERROR
+        "OpenMSThermoBridge: Failed to download pre-built managed artifact: ${_openms_thermo_bridge_download_message}\n"
+        "URL: ${_openms_thermo_bridge_prebuilt_url}\n"
+        "Either provide -DOPENMS_THERMO_BRIDGE_PREBUILT_MANAGED_DIR=/path/to/extracted or ensure a .NET 8 SDK is "
+        "available so CMake can build the managed bridge itself.")
+    endif()
+  else()
+    message(STATUS "OpenMSThermoBridge: Using cached pre-built artifact at ${_openms_thermo_bridge_prebuilt_zip}")
   endif()
 
   file(MAKE_DIRECTORY "${_openms_thermo_bridge_prebuilt_extract_dir}")
-  execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E tar xf "${_openms_thermo_bridge_prebuilt_zip}"
-    WORKING_DIRECTORY "${_openms_thermo_bridge_prebuilt_extract_dir}"
-    RESULT_VARIABLE _openms_thermo_bridge_extract_result)
-  if(NOT _openms_thermo_bridge_extract_result EQUAL 0)
-    message(FATAL_ERROR "OpenMSThermoBridge: Failed to extract pre-built managed artifact.")
+  if(NOT EXISTS "${_openms_thermo_bridge_prebuilt_extract_dir}/ThermoWrapperManaged.dll")
+    execute_process(
+      COMMAND "${CMAKE_COMMAND}" -E tar xf "${_openms_thermo_bridge_prebuilt_zip}"
+      WORKING_DIRECTORY "${_openms_thermo_bridge_prebuilt_extract_dir}"
+      RESULT_VARIABLE _openms_thermo_bridge_extract_result)
+    if(NOT _openms_thermo_bridge_extract_result EQUAL 0)
+      message(FATAL_ERROR "OpenMSThermoBridge: Failed to extract pre-built managed artifact.")
+    endif()
   endif()
 
   set(OPENMS_THERMO_BRIDGE_PREBUILT_MANAGED_DIR "${_openms_thermo_bridge_prebuilt_extract_dir}"
