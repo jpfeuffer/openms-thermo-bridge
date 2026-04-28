@@ -49,6 +49,26 @@ endif()
 
 if(NOT OPENMS_THERMO_BRIDGE_PREBUILT_MANAGED_DIR AND NOT OPENMS_THERMO_BRIDGE_DOWNLOAD_PREBUILT_MANAGED)
   find_program(DOTNET_EXECUTABLE NAMES dotnet REQUIRED)
+  execute_process(
+    COMMAND "${DOTNET_EXECUTABLE}" --list-sdks
+    RESULT_VARIABLE OPENMS_THERMO_BRIDGE_DOTNET_SDK_LIST_RESULT
+    OUTPUT_VARIABLE OPENMS_THERMO_BRIDGE_DOTNET_SDK_LIST_OUTPUT
+    ERROR_VARIABLE OPENMS_THERMO_BRIDGE_DOTNET_SDK_LIST_ERROR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_STRIP_TRAILING_WHITESPACE)
+  if(NOT OPENMS_THERMO_BRIDGE_DOTNET_SDK_LIST_RESULT EQUAL 0
+     OR OPENMS_THERMO_BRIDGE_DOTNET_SDK_LIST_OUTPUT STREQUAL "")
+    message(FATAL_ERROR
+      "OpenMSThermoBridge: building ThermoWrapperManaged.csproj locally requires a .NET SDK because CMake runs "
+      "'${DOTNET_EXECUTABLE} publish'. The detected dotnet executable did not report any installed SDKs via "
+      "'${DOTNET_EXECUTABLE} --list-sdks'.\n"
+      "Install a matching .NET SDK (for example .NET 8), or use "
+      "-DOPENMS_THERMO_BRIDGE_PREBUILT_MANAGED_DIR=/path/to/prebuilt or "
+      "-DOPENMS_THERMO_BRIDGE_DOWNLOAD_PREBUILT_MANAGED=ON to skip the local managed publish step.\n"
+      "Even with pre-built managed artifacts, the native bridge still needs the platform-specific nethost headers "
+      "and library, which are usually provided by the .NET SDK/host pack rather than a runtime-only install.\n"
+      "dotnet --list-sdks stderr: ${OPENMS_THERMO_BRIDGE_DOTNET_SDK_LIST_ERROR}")
+  endif()
 else()
   find_program(DOTNET_EXECUTABLE NAMES dotnet)
 endif()

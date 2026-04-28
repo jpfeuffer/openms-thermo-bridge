@@ -43,9 +43,10 @@ cmake -S . -B build \
 cmake --build build --parallel
 ```
 
-### Option 3: use pre-built managed DLLs (no .NET SDK required at build time)
+### Option 3: use pre-built managed DLLs
 
-Pre-built managed artifacts for each platform are published as GitHub Release assets. You only need the .NET 8 **runtime** (not the SDK) on the target machine at runtime.
+Pre-built managed artifacts for each platform are published as GitHub Release assets, so CMake does not need to run `dotnet publish` for `ThermoWrapperManaged.csproj`.
+The final executable still needs the .NET 8 **runtime** at runtime, and the native bridge build still needs the platform-specific `nethost` headers and library. In practice those `nethost` development files usually come from the .NET SDK/host pack rather than a runtime-only install.
 
 #### Manually download and unpack
 
@@ -67,7 +68,7 @@ cmake -S . -B build \
 cmake --build build --parallel
 ```
 
-> **Note:** On Apple Silicon, pre-built artifacts are always `osx-x64` and run via Rosetta, consistent with the existing `OPENMS_THERMO_BRIDGE_OSX_ARM64_X64_WORKAROUND` behaviour.
+> **Note:** On Apple Silicon, pre-built artifacts are always `osx-x64` and run via Rosetta, consistent with the existing `OPENMS_THERMO_BRIDGE_OSX_ARM64_X64_WORKAROUND` behaviour. You still need an `osx-x64` .NET installation that provides the matching `nethost` files.
 
 For Linux convenience, `build_linux.sh` configures, builds, and runs the tests with the vendor-download option enabled.
 
@@ -117,7 +118,9 @@ openms_thermo_bridge_copy_runtime_files(TARGET my_tool)
 
 ## Requirements
 - CMake 3.21+
-- .NET 8 SDK with the platform-specific `nethost` pack installed (**not** required when using pre-built artifacts; only the .NET 8 runtime is needed at runtime)
+- .NET 8 SDK when CMake builds `ThermoWrapperManaged.csproj` locally with `dotnet publish`
+- Platform-specific `.NET` `nethost` headers and library to build the native bridge; these usually come from the .NET SDK/host pack even when using pre-built managed artifacts
+- .NET 8 runtime for the final executable at runtime
 - A C++17 compiler
 - Network access to `api.nuget.org` and, when the relevant options are enabled, `raw.githubusercontent.com`
 - On Apple Silicon macOS, an `osx-x64` .NET 8 installation usable through Rosetta when the workaround is enabled

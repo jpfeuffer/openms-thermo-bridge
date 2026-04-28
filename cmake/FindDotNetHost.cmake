@@ -32,6 +32,18 @@ if(NOT _dotnet_host_rid)
   message(FATAL_ERROR "Unsupported platform for DotNetHost: ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
+if(OPENMS_THERMO_BRIDGE_PREBUILT_MANAGED_DIR OR OPENMS_THERMO_BRIDGE_DOWNLOAD_PREBUILT_MANAGED)
+  set(_dotnet_host_requirements_message
+    "OpenMSThermoBridge can reuse pre-built managed artifacts, but compiling the native bridge still requires the "
+    ".NET nethost headers and library for ${_dotnet_host_rid}. Those files usually come from the platform-specific "
+    ".NET SDK/host pack rather than a runtime-only install.")
+else()
+  set(_dotnet_host_requirements_message
+    "OpenMSThermoBridge builds ThermoWrapperManaged.csproj locally with 'dotnet publish' and also needs the .NET "
+    "nethost headers and library for ${_dotnet_host_rid}. Install a matching .NET SDK so both requirements are "
+    "available.")
+endif()
+
 set(_dotnet_host_roots)
 if(APPLE AND _dotnet_host_rid STREQUAL "osx-x64" AND DEFINED ENV{DOTNET_ROOT_X64} AND NOT "$ENV{DOTNET_ROOT_X64}" STREQUAL "")
   file(TO_CMAKE_PATH "$ENV{DOTNET_ROOT_X64}" _dotnet_root_x64_path)
@@ -110,6 +122,7 @@ find_package_handle_standard_args(DotNetHost
   REQUIRED_VARS DotNetHost_INCLUDE_DIR DotNetHost_LIBRARY
   FAIL_MESSAGE [=[
 Could not locate the .NET nethost SDK pack for ${_dotnet_host_rid}.
+${_dotnet_host_requirements_message}
 For the Apple Silicon Rosetta workaround, install an osx-x64 .NET SDK/runtime
 and set DOTNET_ROOT_X64 (or DOTNET_ROOT) to that x64 installation.
 ]=])
